@@ -103,8 +103,6 @@ func (client *Client) Connect() {
 	}
 	client.Connection = conn
 	client.Logger.Log("Connected to server")
-
-	go client.ReceiveData()
 }
 
 func (client *Client) Disconnect() {
