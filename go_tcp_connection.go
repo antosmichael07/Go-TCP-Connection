@@ -8,18 +8,22 @@ import (
 )
 
 type Server struct {
-	Connection net.Conn
-	Listener   net.Listener
-	Address    string
-	Logger     custom_logger.Logger
-	Events     map[string]func(string)
+	Connection     net.Conn
+	Listener       net.Listener
+	Address        string
+	Logger         custom_logger.Logger
+	Events         map[string]func(string)
+	PossibleEvents []string
+	ShuoldStop     bool
 }
 
 type Client struct {
-	Connection net.Conn
-	Address    string
-	Logger     custom_logger.Logger
-	Events     map[string]func(string)
+	Connection     net.Conn
+	Address        string
+	Logger         custom_logger.Logger
+	Events         map[string]func(string)
+	PossibleEvents []string
+	ShouldStop     bool
 }
 
 type Package struct {
@@ -33,20 +37,24 @@ func (pkg Package) String() string {
 
 func NewServer(address string) Server {
 	return Server{
-		Connection: nil,
-		Listener:   nil,
-		Address:    address,
-		Logger:     custom_logger.NewLogger(),
-		Events:     make(map[string]func(string)),
+		Connection:     nil,
+		Listener:       nil,
+		Address:        address,
+		Logger:         custom_logger.NewLogger(),
+		Events:         make(map[string]func(string)),
+		PossibleEvents: []string{},
+		ShuoldStop:     false,
 	}
 }
 
 func NewClient(address string) Client {
 	return Client{
-		Connection: nil,
-		Address:    address,
-		Logger:     custom_logger.NewLogger(),
-		Events:     make(map[string]func(string)),
+		Connection:     nil,
+		Address:        address,
+		Logger:         custom_logger.NewLogger(),
+		Events:         make(map[string]func(string)),
+		PossibleEvents: []string{},
+		ShouldStop:     false,
 	}
 }
 
@@ -58,7 +66,7 @@ func (server *Server) Start() {
 	server.Listener = listener
 	server.Logger.Log("Server is listening on %s", server.Address)
 
-	for {
+	for !server.ShuoldStop {
 		server.Connection, err = server.Listener.Accept()
 		if err != nil {
 			server.Logger.Log("Error accepting connection: %s", err)
@@ -69,6 +77,7 @@ func (server *Server) Start() {
 }
 
 func (server *Server) Stop() {
+	server.ShuoldStop = true
 	server.Listener.Close()
 	server.Logger.Log("Server stopped")
 }
@@ -89,10 +98,16 @@ func (server *Server) ReceiveData() {
 		server.Logger.Log("Error reading data: %s", err)
 	}
 	server.Logger.Log("Data received: %s", tmp[1])
-	server.Events[tmp[0]](tmp[1])
+	for _, event := range server.PossibleEvents {
+		if event == tmp[0] {
+			server.Events[tmp[0]](tmp[1])
+			break
+		}
+	}
 }
 
 func (server *Server) On(event string, callback func(string)) {
+	server.PossibleEvents = append(server.PossibleEvents, event)
 	server.Events[event] = callback
 }
 
@@ -106,6 +121,7 @@ func (client *Client) Connect() {
 }
 
 func (client *Client) Disconnect() {
+	client.ShouldStop = true
 	client.Connection.Close()
 	client.Logger.Log("Connection closed")
 }
@@ -126,9 +142,21 @@ func (client *Client) ReceiveData() {
 		client.Logger.Log("Error receiving data: %s", err)
 	}
 	client.Logger.Log("Data received: %s", tmp[1])
-	client.Events[tmp[0]](tmp[1])
+	for _, event := range client.PossibleEvents {
+		if event == tmp[0] {
+			client.Events[tmp[0]](tmp[1])
+			break
+		}
+	}
 }
 
 func (client *Client) On(event string, callback func(string)) {
+	client.PossibleEvents = append(client.PossibleEvents, event)
 	client.Events[event] = callback
+}
+
+func (client *Client) Listen() {
+	for !client.ShouldStop {
+		client.ReceiveData()
+	}
 }
