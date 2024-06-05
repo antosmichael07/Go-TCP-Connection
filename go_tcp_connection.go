@@ -2,6 +2,8 @@ package tcp
 
 import (
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net"
 
 	lgr "github.com/antosmichael07/Go-Logger"
@@ -118,8 +120,14 @@ func (server *Server) ReceiveData(conn net.Conn) {
 
 	if server.Connections[pkg.Token] == nil {
 		if pkg.Event == "connect" {
+			token := ""
+			for i := 0; i < 32; i++ {
+				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+			}
+
 			server.Connections[pkg.Token] = conn
-			server.Logger.Log(lgr.Info, "New connection with token: %s", pkg.Token)
+			server.Logger.Log(lgr.Info, "New connection: %s", pkg.Token)
+			server.SendData(conn, "token", []byte(pkg.Token))
 			return
 		}
 		return
