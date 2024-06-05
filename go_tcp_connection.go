@@ -82,7 +82,6 @@ func (server *Server) Start() {
 
 	for !server.ShouldStop {
 		conn, err := server.Listener.Accept()
-		server.Logger.Log(lgr.Info, "New connection from")
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
@@ -106,49 +105,51 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 }
 
 func (server *Server) ReceiveData(conn net.Conn) {
-	data := make([]byte, 1024)
-	n, err := conn.Read(data)
-	data = data[:n]
-	if err != nil {
-		server.Logger.Log(lgr.Error, "Error reading data: %s", err)
-		return
-	}
-
-	pkg := Package{}
-	err = json.Unmarshal(data, &pkg)
-	if err != nil {
-		server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
-		return
-	}
-
-	is_token := false
-	for _, v := range server.Tokens {
-		if v == pkg.Token {
-			is_token = true
-			break
-		}
-	}
-	if pkg.Event == "connect" && !is_token {
-		token := ""
-		for i := 0; i < 32; i++ {
-			token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+	for {
+		data := make([]byte, 1024)
+		n, err := conn.Read(data)
+		data = data[:n]
+		if err != nil {
+			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
+			continue
 		}
 
-		server.Connections[token] = conn
-		server.Tokens = append(server.Tokens, token)
-		server.Logger.Log(lgr.Info, "New connection: %s", token)
-		server.SendData(conn, "token", []byte(token))
-		return
-	}
-	if !is_token {
-		server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
-	}
+		pkg := Package{}
+		err = json.Unmarshal(data, &pkg)
+		if err != nil {
+			server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+			continue
+		}
 
-	server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
-	for _, event := range server.PossibleEvents {
-		if event == pkg.Event {
-			server.Events[pkg.Event](pkg.Data, server.Connections[pkg.Token])
-			break
+		is_token := false
+		for _, v := range server.Tokens {
+			if v == pkg.Token {
+				is_token = true
+				break
+			}
+		}
+		if pkg.Event == "connect" && !is_token {
+			token := ""
+			for i := 0; i < 32; i++ {
+				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+			}
+
+			server.Connections[token] = conn
+			server.Tokens = append(server.Tokens, token)
+			server.Logger.Log(lgr.Info, "New connection: %s", token)
+			server.SendData(conn, "token", []byte(token))
+			continue
+		}
+		if !is_token {
+			server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
+		}
+
+		server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
+		for _, event := range server.PossibleEvents {
+			if event == pkg.Event {
+				server.Events[pkg.Event](pkg.Data, server.Connections[pkg.Token])
+				break
+			}
 		}
 	}
 }
