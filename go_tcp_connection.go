@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"time"
 
 	lgr "github.com/antosmichael07/Go-Logger"
 )
@@ -87,6 +86,7 @@ func (server *Server) Start() {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
+		server.Logger.Log(lgr.Info, "New connection from %s", conn.RemoteAddr())
 		go server.ReceiveData(conn)
 	}
 }
@@ -171,15 +171,11 @@ func (client *Client) Connect() {
 	client.On("token", func(data []byte) {
 		client.Logger.Log(lgr.Info, "Token received: %s", data)
 		client.Token = string(data)
-		go func() {
-			time.Sleep(1 * time.Second)
-			client.OnConnectFunc()
-		}()
+		go client.OnConnectFunc()
 	})
 }
 
 func (client *Client) Disconnect() {
-	client.SendData("disconnect", []byte{})
 	client.ShouldStop = true
 	client.Connection.Close()
 	client.Logger.Log(lgr.Info, "Connection closed")
