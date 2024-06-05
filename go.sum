@@ -6,3 +6,5 @@ github.com/antosmichael07/Go-Logger v1.9.0 h1:BGz2LYzjg1URTbrJBQtQSmWvqBjBeu22H2
 github.com/antosmichael07/Go-Logger v1.9.0/go.mod h1:v+v085J0A+Cdi76SanfvKA10216jy45azC6VM+sh16Q=
 github.com/antosmichael07/Go-Logger v1.11.0 h1:j2cxmlX+Z+oR50VfMhfSlGxiKlbAIYQ+xfjy2GcL2n0=
 github.com/antosmichael07/Go-Logger v1.11.0/go.mod h1:v+v085J0A+Cdi76SanfvKA10216jy45azC6VM+sh16Q=
+github.com/antosmichael07/Go-Logger v1.12.0 h1:Immw4VJpA1BD62XgQ96Qd4rPSUeb8CC8W66zlPsHIHw=
+github.com/antosmichael07/Go-Logger v1.12.0/go.mod h1:v+v085J0A+Cdi76SanfvKA10216jy45azC6VM+sh16Q=

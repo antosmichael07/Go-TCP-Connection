@@ -36,14 +36,11 @@ func (pkg Package) String() string {
 }
 
 func NewServer(address string) Server {
-	logger := lgr.NewLogger()
-	logger.Name = "TCP"
-
 	return Server{
 		Connection:     nil,
 		Listener:       nil,
 		Address:        address,
-		Logger:         logger,
+		Logger:         lgr.NewLogger("TCP"),
 		Events:         make(map[string]func(string)),
 		PossibleEvents: []string{},
 		ShuoldStop:     false,
@@ -54,7 +51,7 @@ func NewClient(address string) Client {
 	return Client{
 		Connection:     nil,
 		Address:        address,
-		Logger:         lgr.NewLogger(),
+		Logger:         lgr.NewLogger("TCP"),
 		Events:         make(map[string]func(string)),
 		PossibleEvents: []string{},
 		ShouldStop:     false,
