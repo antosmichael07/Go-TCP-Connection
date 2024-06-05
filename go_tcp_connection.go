@@ -142,6 +142,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		}
 		if !is_token {
 			server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
+			continue
 		}
 
 		server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
