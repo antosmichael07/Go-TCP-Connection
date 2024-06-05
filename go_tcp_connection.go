@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"time"
 
 	lgr "github.com/antosmichael07/Go-Logger"
 )
@@ -105,7 +106,6 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 }
 
 func (server *Server) ReceiveData(conn net.Conn) {
-	server.Logger.Log(lgr.Info, "Data received")
 	data := make([]byte, 1024)
 	n, err := conn.Read(data)
 	data = data[:n]
@@ -171,7 +171,10 @@ func (client *Client) Connect() {
 	client.On("token", func(data []byte) {
 		client.Logger.Log(lgr.Info, "Token received: %s", data)
 		client.Token = string(data)
-		go client.OnConnectFunc()
+		go func() {
+			time.Sleep(1 * time.Second)
+			client.OnConnectFunc()
+		}()
 	})
 }
 
