@@ -81,8 +81,8 @@ func (server *Server) Start() {
 	server.Logger.Log(lgr.Info, "Server is listening on %s", server.Address)
 
 	for !server.ShouldStop {
-		server.Logger.Log(lgr.Info, "New connection from")
 		conn, err := server.Listener.Accept()
+		server.Logger.Log(lgr.Info, "New connection from")
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
