@@ -100,7 +100,8 @@ func (server *Server) SendData(event string, data []byte) {
 
 func (server *Server) ReceiveData() {
 	data := make([]byte, 1024)
-	_, err := server.Connection.Read(data)
+	n, err := server.Connection.Read(data)
+	data = data[:n]
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error reading data: %s", err)
 		return
@@ -152,7 +153,8 @@ func (client *Client) SendData(event string, data []byte) {
 
 func (client *Client) ReceiveData() {
 	data := make([]byte, 1024)
-	_, err := client.Connection.Read(data)
+	n, err := client.Connection.Read(data)
+	data = data[:n]
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
 		return
