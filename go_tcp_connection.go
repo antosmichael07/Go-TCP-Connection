@@ -3,7 +3,6 @@ package tcp
 import (
 	"encoding/json"
 	"net"
-	"strings"
 
 	lgr "github.com/antosmichael07/Go-Logger"
 )
@@ -13,7 +12,7 @@ type Server struct {
 	Listener       net.Listener
 	Address        string
 	Logger         lgr.Logger
-	Events         map[string]func(string)
+	Events         map[string]func([]byte)
 	PossibleEvents []string
 	ShuoldStop     bool
 }
@@ -22,7 +21,7 @@ type Client struct {
 	Connection     net.Conn
 	Address        string
 	Logger         lgr.Logger
-	Events         map[string]func(string)
+	Events         map[string]func([]byte)
 	PossibleEvents []string
 	ShouldStop     bool
 }
@@ -50,7 +49,7 @@ func NewServer(address string) Server {
 		Listener:       nil,
 		Address:        address,
 		Logger:         lgr.NewLogger("TCP"),
-		Events:         make(map[string]func(string)),
+		Events:         make(map[string]func([]byte)),
 		PossibleEvents: []string{},
 		ShuoldStop:     false,
 	}
@@ -61,7 +60,7 @@ func NewClient(address string) Client {
 		Connection:     nil,
 		Address:        address,
 		Logger:         lgr.NewLogger("TCP"),
-		Events:         make(map[string]func(string)),
+		Events:         make(map[string]func([]byte)),
 		PossibleEvents: []string{},
 		ShouldStop:     false,
 	}
@@ -92,7 +91,7 @@ func (server *Server) Stop() {
 }
 
 func (server *Server) SendData(event string, data []byte) {
-	_, err := server.Connection.Write([]byte(Package{Event: event, Data: data}.ToByte()))
+	_, err := server.Connection.Write(Package{Event: event, Data: data}.ToByte())
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
@@ -101,21 +100,29 @@ func (server *Server) SendData(event string, data []byte) {
 
 func (server *Server) ReceiveData() {
 	data := make([]byte, 1024)
-	n, err := server.Connection.Read(data)
-	tmp := strings.Split(string(data[:n]), "|")
+	_, err := server.Connection.Read(data)
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error reading data: %s", err)
+		return
 	}
-	server.Logger.Log(lgr.Info, "Data received: %s", tmp[1])
+
+	pkg := Package{}
+	err = json.Unmarshal(data, &pkg)
+	if err != nil {
+		server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+		return
+	}
+
+	server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 	for _, event := range server.PossibleEvents {
-		if event == tmp[0] {
-			server.Events[tmp[0]](tmp[1])
+		if event == pkg.Event {
+			server.Events[pkg.Event](pkg.Data)
 			break
 		}
 	}
 }
 
-func (server *Server) On(event string, callback func(string)) {
+func (server *Server) On(event string, callback func([]byte)) {
 	server.PossibleEvents = append(server.PossibleEvents, event)
 	server.Events[event] = callback
 }
@@ -136,7 +143,7 @@ func (client *Client) Disconnect() {
 }
 
 func (client *Client) SendData(event string, data []byte) {
-	_, err := client.Connection.Write([]byte(Package{Event: event, Data: data}.ToByte()))
+	_, err := client.Connection.Write(Package{Event: event, Data: data}.ToByte())
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
@@ -145,21 +152,29 @@ func (client *Client) SendData(event string, data []byte) {
 
 func (client *Client) ReceiveData() {
 	data := make([]byte, 1024)
-	n, err := client.Connection.Read(data)
-	tmp := strings.Split(string(data[:n]), "|")
+	_, err := client.Connection.Read(data)
 	if err != nil {
-		client.Logger.Log(lgr.Error, "Error receiving data: %s", err)
+		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
+		return
 	}
-	client.Logger.Log(lgr.Info, "Data received: %s", tmp[1])
+
+	pkg := Package{}
+	err = json.Unmarshal(data, &pkg)
+	if err != nil {
+		client.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+		return
+	}
+
+	client.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 	for _, event := range client.PossibleEvents {
-		if event == tmp[0] {
-			client.Events[tmp[0]](tmp[1])
+		if event == pkg.Event {
+			client.Events[pkg.Event](pkg.Data)
 			break
 		}
 	}
 }
 
-func (client *Client) On(event string, callback func(string)) {
+func (client *Client) On(event string, callback func([]byte)) {
 	client.PossibleEvents = append(client.PossibleEvents, event)
 	client.Events[event] = callback
 }
