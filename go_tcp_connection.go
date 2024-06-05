@@ -109,6 +109,12 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 	server.Logger.Log(lgr.Info, "Data sent with the event name: %s", event)
 }
 
+func (server *Server) SendDataToAll(event string, data []byte) {
+	for _, conn := range server.Connections {
+		server.SendData(conn, event, data)
+	}
+}
+
 func (server *Server) ReceiveData(conn net.Conn) {
 	for {
 		data := make([]byte, 1024)
