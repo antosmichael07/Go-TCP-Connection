@@ -37,16 +37,16 @@ type Package struct {
 	Data  []byte
 }
 
-func (pkg Package) ToByte() []byte {
+func (pkg Package) ToByte() (bool, []byte) {
 	logger := lgr.NewLogger("TCP")
 
 	data, err := json.Marshal(pkg)
 	if err != nil {
-		logger.Log(lgr.Error, "Error marshaling package")
-		panic(err)
+		logger.Log(lgr.Error, "Error marshaling package: %s", err)
+		return false, []byte{}
 	}
 
-	return data
+	return true, data
 }
 
 func NewServer(address string) Server {
@@ -97,7 +97,12 @@ func (server *Server) Stop() {
 }
 
 func (server *Server) SendData(conn net.Conn, event string, data []byte) {
-	_, err := conn.Write(Package{Event: event, Data: data}.ToByte())
+	can_send, to_send := Package{Event: event, Data: data}.ToByte()
+	if !can_send {
+		server.Logger.Log(lgr.Error, "Error creating package")
+		return
+	}
+	_, err := conn.Write(to_send)
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
@@ -111,6 +116,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		data = data[:n]
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
+			server.SendData(conn, "error", []byte("Invalid data sent"))
 			continue
 		}
 
@@ -118,6 +124,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		err = json.Unmarshal(data, &pkg)
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+			server.SendData(conn, "error", []byte("Invalid data sent"))
 			continue
 		}
 
@@ -141,7 +148,8 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			continue
 		}
 		if !is_token {
-			server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
+			server.Logger.Log(lgr.Warining, "Invalid token: %s", pkg.Token)
+			server.SendData(conn, "error", []byte("Invalid token"))
 			continue
 		}
 
@@ -175,6 +183,10 @@ func (client *Client) Connect() {
 		client.Token = string(data)
 		go client.OnConnectFunc()
 	})
+
+	client.On("error", func(data []byte) {
+		client.Logger.Log(lgr.Error, "Error received: %s", data)
+	})
 }
 
 func (client *Client) Disconnect() {
@@ -184,7 +196,12 @@ func (client *Client) Disconnect() {
 }
 
 func (client *Client) SendData(event string, data []byte) {
-	_, err := client.Connection.Write(Package{Token: client.Token, Event: event, Data: data}.ToByte())
+	can_send, to_send := Package{Token: client.Token, Event: event, Data: data}.ToByte()
+	if !can_send {
+		client.Logger.Log(lgr.Error, "Error creating package")
+		return
+	}
+	_, err := client.Connection.Write(to_send)
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
