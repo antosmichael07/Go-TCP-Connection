@@ -80,6 +80,7 @@ func (server *Server) Start() {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
+		server.Logger.Log(lgr.Info, "Connection accepted")
 		go server.ReceiveData()
 	}
 }
