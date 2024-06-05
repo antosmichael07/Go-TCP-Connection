@@ -81,12 +81,12 @@ func (server *Server) Start() {
 	server.Logger.Log(lgr.Info, "Server is listening on %s", server.Address)
 
 	for !server.ShouldStop {
+		server.Logger.Log(lgr.Info, "New connection from")
 		conn, err := server.Listener.Accept()
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
-		server.Logger.Log(lgr.Info, "New connection from %s", conn.RemoteAddr())
 		go server.ReceiveData(conn)
 	}
 }
