@@ -125,9 +125,9 @@ func (server *Server) ReceiveData(conn net.Conn) {
 				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
 			}
 
-			server.Connections[pkg.Token] = conn
-			server.Logger.Log(lgr.Info, "New connection: %s", pkg.Token)
-			server.SendData(conn, "token", []byte(pkg.Token))
+			server.Connections[token] = conn
+			server.Logger.Log(lgr.Info, "New connection: %s", token)
+			server.SendData(conn, "token", []byte(token))
 			return
 		}
 		return
