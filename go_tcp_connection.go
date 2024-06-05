@@ -116,8 +116,9 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		data = data[:n]
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
-			server.SendData(conn, "error", []byte("Invalid data sent"))
-			continue
+			server.SendData(conn, "error", []byte("Invalid data sent, connection terminated"))
+			conn.Close()
+			return
 		}
 
 		pkg := Package{}
