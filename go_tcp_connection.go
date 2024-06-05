@@ -97,7 +97,7 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
-	server.Logger.Log(lgr.Info, "Data sent: %s", data)
+	server.Logger.Log(lgr.Info, "Data sent with the event name: %s", event)
 }
 
 func (server *Server) ReceiveData(conn net.Conn) {
@@ -167,7 +167,7 @@ func (client *Client) SendData(event string, data []byte) {
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
-	client.Logger.Log(lgr.Info, "Data sent: %s", data)
+	client.Logger.Log(lgr.Info, "Data sent with the event name: %s", event)
 }
 
 func (client *Client) ReceiveData() {
