@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"encoding/json"
 	"net"
 	"strings"
 
@@ -28,11 +29,19 @@ type Client struct {
 
 type Package struct {
 	Event string
-	Data  string
+	Data  []byte
 }
 
-func (pkg Package) String() string {
-	return pkg.Event + "|" + string(pkg.Data)
+func (pkg Package) ToByte() []byte {
+	logger := lgr.NewLogger("TCP")
+
+	data, err := json.Marshal(pkg)
+	if err != nil {
+		logger.Log(lgr.Error, "Error marshaling package")
+		panic(err)
+	}
+
+	return data
 }
 
 func NewServer(address string) Server {
@@ -82,8 +91,8 @@ func (server *Server) Stop() {
 	server.Logger.Log(lgr.Info, "Server stopped")
 }
 
-func (server *Server) SendData(event string, data string) {
-	_, err := server.Connection.Write([]byte(Package{Event: event, Data: data}.String()))
+func (server *Server) SendData(event string, data []byte) {
+	_, err := server.Connection.Write([]byte(Package{Event: event, Data: data}.ToByte()))
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
@@ -126,8 +135,8 @@ func (client *Client) Disconnect() {
 	client.Logger.Log(lgr.Info, "Connection closed")
 }
 
-func (client *Client) SendData(event string, data string) {
-	_, err := client.Connection.Write([]byte(Package{Event: event, Data: data}.String()))
+func (client *Client) SendData(event string, data []byte) {
+	_, err := client.Connection.Write([]byte(Package{Event: event, Data: data}.ToByte()))
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
