@@ -10,7 +10,7 @@ import (
 )
 
 type Server struct {
-	Connections    map[string]net.Conn
+	Connections    []net.Conn
 	Tokens         []string
 	Listener       net.Listener
 	Address        string
@@ -51,7 +51,7 @@ func (pkg Package) ToByte() (bool, []byte) {
 
 func NewServer(address string) Server {
 	return Server{
-		Connections:    map[string]net.Conn{},
+		Connections:    []net.Conn{},
 		Listener:       nil,
 		Address:        address,
 		Logger:         lgr.NewLogger("TCP"),
@@ -124,6 +124,14 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
 			server.SendData(conn, "error", []byte("Invalid data sent, connection terminated"))
 			conn.Close()
+			for i, c := range server.Connections {
+				if c == conn {
+					server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
+					server.Tokens = append(server.Tokens[:i], server.Tokens[i+1:]...)
+					server.Logger.Log(lgr.Info, "Connection terminated")
+					break
+				}
+			}
 			return
 		}
 
@@ -148,7 +156,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
 			}
 
-			server.Connections[token] = conn
+			server.Connections = append(server.Connections, conn)
 			server.Tokens = append(server.Tokens, token)
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
 			server.SendData(conn, "token", []byte(token))
@@ -163,7 +171,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 		for _, event := range server.PossibleEvents {
 			if event == pkg.Event {
-				server.Events[pkg.Event](pkg.Data, server.Connections[pkg.Token])
+				server.Events[pkg.Event](pkg.Data, conn)
 				break
 			}
 		}
