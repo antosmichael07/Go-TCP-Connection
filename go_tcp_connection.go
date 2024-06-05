@@ -117,7 +117,7 @@ func (server *Server) SendDataToAll(event string, data []byte) {
 
 func (server *Server) ReceiveData(conn net.Conn) {
 	for !server.ShouldStop {
-		data := make([]byte, 1024)
+		data := make([]byte, 16384)
 		n, err := conn.Read(data)
 		data = data[:n]
 		if err != nil {
@@ -223,7 +223,7 @@ func (client *Client) SendData(event string, data []byte) {
 }
 
 func (client *Client) ReceiveData() {
-	data := make([]byte, 1024)
+	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
 	data = data[:n]
 	if err != nil {
