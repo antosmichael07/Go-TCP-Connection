@@ -80,7 +80,6 @@ func (server *Server) Start() {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
-		server.Logger.Log(lgr.Info, "Connection accepted")
 		go server.ReceiveData()
 	}
 }
@@ -100,6 +99,7 @@ func (server *Server) SendData(event string, data []byte) {
 }
 
 func (server *Server) ReceiveData() {
+	server.Logger.Log(lgr.Info, "Started receiving data")
 	data := make([]byte, 1024)
 	_, err := server.Connection.Read(data)
 	if err != nil {
