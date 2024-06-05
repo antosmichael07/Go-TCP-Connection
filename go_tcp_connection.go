@@ -162,7 +162,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			continue
 		}
 		if !is_token {
-			server.Logger.Log(lgr.Warining, "Invalid token: %s", pkg.Token)
+			server.Logger.Log(lgr.Warning, "Invalid token: %s", pkg.Token)
 			server.SendData(conn, "error", []byte("Invalid token"))
 			continue
 		}
