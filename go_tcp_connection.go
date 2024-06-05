@@ -8,13 +8,13 @@ import (
 )
 
 type Server struct {
-	Connection     net.Conn
+	Connections    map[string]net.Conn
 	Listener       net.Listener
 	Address        string
 	Logger         lgr.Logger
-	Events         map[string]func([]byte)
+	Events         map[string]func([]byte, net.Conn)
 	PossibleEvents []string
-	ShuoldStop     bool
+	ShouldStop     bool
 }
 
 type Client struct {
@@ -24,9 +24,11 @@ type Client struct {
 	Events         map[string]func([]byte)
 	PossibleEvents []string
 	ShouldStop     bool
+	Token          string
 }
 
 type Package struct {
+	Token string
 	Event string
 	Data  []byte
 }
@@ -45,13 +47,13 @@ func (pkg Package) ToByte() []byte {
 
 func NewServer(address string) Server {
 	return Server{
-		Connection:     nil,
+		Connections:    map[string]net.Conn{},
 		Listener:       nil,
 		Address:        address,
 		Logger:         lgr.NewLogger("TCP"),
-		Events:         make(map[string]func([]byte)),
+		Events:         make(map[string]func([]byte, net.Conn)),
 		PossibleEvents: []string{},
-		ShuoldStop:     false,
+		ShouldStop:     false,
 	}
 }
 
@@ -74,33 +76,33 @@ func (server *Server) Start() {
 	server.Listener = listener
 	server.Logger.Log(lgr.Info, "Server is listening on %s", server.Address)
 
-	for !server.ShuoldStop {
-		server.Connection, err = server.Listener.Accept()
+	for !server.ShouldStop {
+		conn, err := server.Listener.Accept()
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
-		go server.ReceiveData()
+		go server.ReceiveData(conn)
 	}
 }
 
 func (server *Server) Stop() {
-	server.ShuoldStop = true
+	server.ShouldStop = true
 	server.Listener.Close()
 	server.Logger.Log(lgr.Info, "Server stopped")
 }
 
-func (server *Server) SendData(event string, data []byte) {
-	_, err := server.Connection.Write(Package{Event: event, Data: data}.ToByte())
+func (server *Server) SendData(conn net.Conn, event string, data []byte) {
+	_, err := conn.Write(Package{Event: event, Data: data}.ToByte())
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
 	server.Logger.Log(lgr.Info, "Data sent: %s", data)
 }
 
-func (server *Server) ReceiveData() {
+func (server *Server) ReceiveData(conn net.Conn) {
 	data := make([]byte, 1024)
-	n, err := server.Connection.Read(data)
+	n, err := conn.Read(data)
 	data = data[:n]
 	if err != nil {
 		server.Logger.Log(lgr.Error, "Error reading data: %s", err)
@@ -114,16 +116,25 @@ func (server *Server) ReceiveData() {
 		return
 	}
 
+	if server.Connections[pkg.Token] == nil {
+		if pkg.Event == "connect" {
+			server.Connections[pkg.Token] = conn
+			server.Logger.Log(lgr.Info, "New connection with token: %s", pkg.Token)
+			return
+		}
+		return
+	}
+
 	server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 	for _, event := range server.PossibleEvents {
 		if event == pkg.Event {
-			server.Events[pkg.Event](pkg.Data)
+			server.Events[pkg.Event](pkg.Data, conn)
 			break
 		}
 	}
 }
 
-func (server *Server) On(event string, callback func([]byte)) {
+func (server *Server) On(event string, callback func([]byte, net.Conn)) {
 	server.PossibleEvents = append(server.PossibleEvents, event)
 	server.Events[event] = callback
 }
@@ -135,16 +146,24 @@ func (client *Client) Connect() {
 	}
 	client.Connection = conn
 	client.Logger.Log(lgr.Info, "Connected to server")
+
+	client.SendData("connect", []byte{})
+
+	client.On("token", func(data []byte) {
+		client.Logger.Log(lgr.Info, "Token received: %s", data)
+		client.Token = string(data)
+	})
 }
 
 func (client *Client) Disconnect() {
+	client.SendData("disconnect", []byte{})
 	client.ShouldStop = true
 	client.Connection.Close()
 	client.Logger.Log(lgr.Info, "Connection closed")
 }
 
 func (client *Client) SendData(event string, data []byte) {
-	_, err := client.Connection.Write(Package{Event: event, Data: data}.ToByte())
+	_, err := client.Connection.Write(Package{Token: client.Token, Event: event, Data: data}.ToByte())
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
