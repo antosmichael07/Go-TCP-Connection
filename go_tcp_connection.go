@@ -105,6 +105,7 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 }
 
 func (server *Server) ReceiveData(conn net.Conn) {
+	server.Logger.Log(lgr.Info, "Data received")
 	data := make([]byte, 1024)
 	n, err := conn.Read(data)
 	data = data[:n]
@@ -141,13 +142,12 @@ func (server *Server) ReceiveData(conn net.Conn) {
 	}
 	if !is_token {
 		server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
-		conn.Close()
 	}
 
 	server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 	for _, event := range server.PossibleEvents {
 		if event == pkg.Event {
-			server.Events[pkg.Event](pkg.Data, conn)
+			server.Events[pkg.Event](pkg.Data, server.Connections[pkg.Token])
 			break
 		}
 	}
