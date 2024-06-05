@@ -27,6 +27,7 @@ type Client struct {
 	PossibleEvents []string
 	ShouldStop     bool
 	Token          string
+	OnConnectFunc  func()
 }
 
 type Package struct {
@@ -160,6 +161,7 @@ func (client *Client) Connect() {
 	client.On("token", func(data []byte) {
 		client.Logger.Log(lgr.Info, "Token received: %s", data)
 		client.Token = string(data)
+		go client.OnConnectFunc()
 	})
 }
 
@@ -213,4 +215,8 @@ func (client *Client) Listen() {
 	for !client.ShouldStop {
 		client.ReceiveData()
 	}
+}
+
+func (client *Client) OnConnect(callback func()) {
+	client.OnConnectFunc = callback
 }
