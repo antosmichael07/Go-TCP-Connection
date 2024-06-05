@@ -11,6 +11,7 @@ import (
 
 type Server struct {
 	Connections    map[string]net.Conn
+	Tokens         []string
 	Listener       net.Listener
 	Address        string
 	Logger         lgr.Logger
@@ -119,19 +120,28 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		return
 	}
 
-	if server.Connections[pkg.Token] == nil {
-		if pkg.Event == "connect" {
-			token := ""
-			for i := 0; i < 32; i++ {
-				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
-			}
-
-			server.Connections[token] = conn
-			server.Logger.Log(lgr.Info, "New connection: %s", token)
-			server.SendData(conn, "token", []byte(token))
-			return
+	is_token := false
+	for _, v := range server.Tokens {
+		if v == pkg.Token {
+			is_token = true
+			break
 		}
+	}
+	if pkg.Event == "connect" && !is_token {
+		token := ""
+		for i := 0; i < 32; i++ {
+			token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+		}
+
+		server.Connections[token] = conn
+		server.Tokens = append(server.Tokens, token)
+		server.Logger.Log(lgr.Info, "New connection: %s", token)
+		server.SendData(conn, "token", []byte(token))
 		return
+	}
+	if !is_token {
+		server.Logger.Log(lgr.Error, "Invalid token: %s", pkg.Token)
+		conn.Close()
 	}
 
 	server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
