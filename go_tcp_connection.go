@@ -4,14 +4,14 @@ import (
 	"net"
 	"strings"
 
-	custom_logger "github.com/antosmichael07/Go-Logger"
+	lgr "github.com/antosmichael07/Go-Logger"
 )
 
 type Server struct {
 	Connection     net.Conn
 	Listener       net.Listener
 	Address        string
-	Logger         custom_logger.Logger
+	Logger         lgr.Logger
 	Events         map[string]func(string)
 	PossibleEvents []string
 	ShuoldStop     bool
@@ -20,7 +20,7 @@ type Server struct {
 type Client struct {
 	Connection     net.Conn
 	Address        string
-	Logger         custom_logger.Logger
+	Logger         lgr.Logger
 	Events         map[string]func(string)
 	PossibleEvents []string
 	ShouldStop     bool
@@ -36,11 +36,14 @@ func (pkg Package) String() string {
 }
 
 func NewServer(address string) Server {
+	logger := lgr.NewLogger()
+	logger.Name = "TCP"
+
 	return Server{
 		Connection:     nil,
 		Listener:       nil,
 		Address:        address,
-		Logger:         custom_logger.NewLogger(),
+		Logger:         logger,
 		Events:         make(map[string]func(string)),
 		PossibleEvents: []string{},
 		ShuoldStop:     false,
@@ -51,7 +54,7 @@ func NewClient(address string) Client {
 	return Client{
 		Connection:     nil,
 		Address:        address,
-		Logger:         custom_logger.NewLogger(),
+		Logger:         lgr.NewLogger(),
 		Events:         make(map[string]func(string)),
 		PossibleEvents: []string{},
 		ShouldStop:     false,
@@ -64,12 +67,12 @@ func (server *Server) Start() {
 		panic(err)
 	}
 	server.Listener = listener
-	server.Logger.LogLevel(2, "Server is listening on %s", server.Address)
+	server.Logger.Log(lgr.Info, "Server is listening on %s", server.Address)
 
 	for !server.ShuoldStop {
 		server.Connection, err = server.Listener.Accept()
 		if err != nil {
-			server.Logger.LogLevel(2, "Error accepting connection: %s", err)
+			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
 
 		go server.ReceiveData()
@@ -79,15 +82,15 @@ func (server *Server) Start() {
 func (server *Server) Stop() {
 	server.ShuoldStop = true
 	server.Listener.Close()
-	server.Logger.LogLevel(2, "Server stopped")
+	server.Logger.Log(lgr.Info, "Server stopped")
 }
 
 func (server *Server) SendData(event string, data string) {
 	_, err := server.Connection.Write([]byte(Package{Event: event, Data: data}.String()))
 	if err != nil {
-		server.Logger.LogLevel(2, "Error sending data: %s", err)
+		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
-	server.Logger.LogLevel(2, "Data sent: %s", data)
+	server.Logger.Log(lgr.Info, "Data sent: %s", data)
 }
 
 func (server *Server) ReceiveData() {
@@ -95,9 +98,9 @@ func (server *Server) ReceiveData() {
 	n, err := server.Connection.Read(data)
 	tmp := strings.Split(string(data[:n]), "|")
 	if err != nil {
-		server.Logger.LogLevel(3, "Error reading data: %s", err)
+		server.Logger.Log(lgr.Error, "Error reading data: %s", err)
 	}
-	server.Logger.LogLevel(3, "Data received: %s", tmp[1])
+	server.Logger.Log(lgr.Info, "Data received: %s", tmp[1])
 	for _, event := range server.PossibleEvents {
 		if event == tmp[0] {
 			server.Events[tmp[0]](tmp[1])
@@ -114,24 +117,24 @@ func (server *Server) On(event string, callback func(string)) {
 func (client *Client) Connect() {
 	conn, err := net.Dial("tcp", client.Address)
 	if err != nil {
-		client.Logger.LogLevel(2, "Error connecting to server: %s", err)
+		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
 	}
 	client.Connection = conn
-	client.Logger.LogLevel(2, "Connected to server")
+	client.Logger.Log(lgr.Info, "Connected to server")
 }
 
 func (client *Client) Disconnect() {
 	client.ShouldStop = true
 	client.Connection.Close()
-	client.Logger.LogLevel(2, "Connection closed")
+	client.Logger.Log(lgr.Info, "Connection closed")
 }
 
 func (client *Client) SendData(event string, data string) {
 	_, err := client.Connection.Write([]byte(Package{Event: event, Data: data}.String()))
 	if err != nil {
-		client.Logger.LogLevel(2, "Error sending data: %s", err)
+		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
-	client.Logger.LogLevel(2, "Data sent: %s", data)
+	client.Logger.Log(lgr.Info, "Data sent: %s", data)
 }
 
 func (client *Client) ReceiveData() {
@@ -139,9 +142,9 @@ func (client *Client) ReceiveData() {
 	n, err := client.Connection.Read(data)
 	tmp := strings.Split(string(data[:n]), "|")
 	if err != nil {
-		client.Logger.LogLevel(3, "Error receiving data: %s", err)
+		client.Logger.Log(lgr.Error, "Error receiving data: %s", err)
 	}
-	client.Logger.LogLevel(3, "Data received: %s", tmp[1])
+	client.Logger.Log(lgr.Info, "Data received: %s", tmp[1])
 	for _, event := range client.PossibleEvents {
 		if event == tmp[0] {
 			client.Events[tmp[0]](tmp[1])
