@@ -156,6 +156,7 @@ func (client *Client) On(event string, callback func(string)) {
 }
 
 func (client *Client) Listen() {
+	client.Logger.Log(lgr.Info, "Started listening")
 	for !client.ShouldStop {
 		client.ReceiveData()
 	}
