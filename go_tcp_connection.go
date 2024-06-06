@@ -10,14 +10,16 @@ import (
 )
 
 type Server struct {
-	Connections    []net.Conn
-	Tokens         []string
-	Listener       net.Listener
-	Address        string
-	Logger         lgr.Logger
-	Events         map[string]func([]byte, net.Conn)
-	PossibleEvents []string
-	ShouldStop     bool
+	Connections      []net.Conn
+	Tokens           []string
+	Listener         net.Listener
+	Address          string
+	Logger           lgr.Logger
+	Events           map[string]func([]byte, net.Conn)
+	PossibleEvents   []string
+	ShouldStop       bool
+	OnConnectFunc    func(conn net.Conn)
+	OnDisconnectFunc func(conn net.Conn)
 }
 
 type Client struct {
@@ -122,6 +124,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		data = data[:n]
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
+			server.OnDisconnectFunc(conn)
 			conn.Close()
 			for i, c := range server.Connections {
 				if c == conn {
@@ -159,6 +162,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			server.Tokens = append(server.Tokens, token)
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
 			server.SendData(conn, "token", []byte(token))
+			server.OnConnectFunc(conn)
 			continue
 		}
 		if !is_token {
@@ -180,6 +184,14 @@ func (server *Server) ReceiveData(conn net.Conn) {
 func (server *Server) On(event string, callback func([]byte, net.Conn)) {
 	server.PossibleEvents = append(server.PossibleEvents, event)
 	server.Events[event] = callback
+}
+
+func (server *Server) OnConnect(callback func(conn net.Conn)) {
+	server.OnConnectFunc = callback
+}
+
+func (server *Server) OnDisconnect(callback func(conn net.Conn)) {
+	server.OnDisconnectFunc = callback
 }
 
 func (client *Client) Connect() {
