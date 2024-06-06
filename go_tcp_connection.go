@@ -161,8 +161,8 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			server.Connections = append(server.Connections, conn)
 			server.Tokens = append(server.Tokens, token)
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
-			server.SendData(conn, "token", []byte(token))
 			server.OnConnectFunc(conn)
+			server.SendData(conn, "token", []byte(token))
 			continue
 		}
 		if !is_token {
