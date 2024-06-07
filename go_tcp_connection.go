@@ -10,16 +10,22 @@ import (
 )
 
 type Server struct {
-	Connections      []net.Conn
-	Tokens           []string
+	Connections      []Connection
 	Listener         net.Listener
 	Address          string
 	Logger           lgr.Logger
-	Events           map[string]func([]byte, net.Conn)
+	Events           map[string]func([]byte, Connection)
 	PossibleEvents   []string
 	ShouldStop       bool
-	OnConnectFunc    func(conn net.Conn)
-	OnDisconnectFunc func(conn net.Conn)
+	OnConnectFunc    func(conn Connection)
+	OnDisconnectFunc func(conn Connection)
+	IsOnConnect      bool
+	IsOnDisconnect   bool
+}
+
+type Connection struct {
+	Connection net.Conn
+	Token      string
 }
 
 type Client struct {
@@ -31,6 +37,7 @@ type Client struct {
 	ShouldStop     bool
 	Token          string
 	OnConnectFunc  func()
+	IsOnConnect    bool
 }
 
 type Package struct {
@@ -53,13 +60,17 @@ func (pkg Package) ToByte() (bool, []byte) {
 
 func NewServer(address string) Server {
 	return Server{
-		Connections:    []net.Conn{},
-		Listener:       nil,
-		Address:        address,
-		Logger:         lgr.NewLogger("TCP"),
-		Events:         make(map[string]func([]byte, net.Conn)),
-		PossibleEvents: []string{},
-		ShouldStop:     false,
+		Connections:      []Connection{},
+		Listener:         nil,
+		Address:          address,
+		Logger:           lgr.NewLogger("TCP"),
+		Events:           make(map[string]func([]byte, Connection)),
+		PossibleEvents:   []string{},
+		ShouldStop:       false,
+		OnConnectFunc:    func(conn Connection) {},
+		OnDisconnectFunc: func(conn Connection) {},
+		IsOnConnect:      false,
+		IsOnDisconnect:   false,
 	}
 }
 
@@ -71,6 +82,9 @@ func NewClient(address string) Client {
 		Events:         make(map[string]func([]byte)),
 		PossibleEvents: []string{},
 		ShouldStop:     false,
+		Token:          "",
+		OnConnectFunc:  func() {},
+		IsOnConnect:    false,
 	}
 }
 
@@ -113,7 +127,7 @@ func (server *Server) SendData(conn net.Conn, event string, data []byte) {
 
 func (server *Server) SendDataToAll(event string, data []byte) {
 	for _, conn := range server.Connections {
-		server.SendData(conn, event, data)
+		server.SendData(conn.Connection, event, data)
 	}
 }
 
@@ -124,12 +138,18 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		data = data[:n]
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
-			server.OnDisconnectFunc(conn)
+			if server.IsOnDisconnect {
+				for _, v := range server.Connections {
+					if v.Connection == conn {
+						server.OnDisconnectFunc(v)
+						break
+					}
+				}
+			}
 			conn.Close()
-			for i, c := range server.Connections {
-				if c == conn {
+			for i, v := range server.Connections {
+				if v.Connection == conn {
 					server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
-					server.Tokens = append(server.Tokens[:i], server.Tokens[i+1:]...)
 					server.Logger.Log(lgr.Info, "Connection terminated")
 					break
 				}
@@ -146,22 +166,29 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		}
 
 		is_token := false
-		for _, v := range server.Tokens {
-			if v == pkg.Token {
+		for _, v := range server.Connections {
+			if v.Token == pkg.Token {
 				is_token = true
 				break
 			}
 		}
 		if pkg.Event == "connect" && !is_token {
 			token := ""
-			for i := 0; i < 32; i++ {
-				token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+			for token == "" {
+				for i := 0; i < 32; i++ {
+					token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+				}
+				for _, v := range server.Connections {
+					if v.Token == token {
+						token = ""
+						break
+					}
+				}
 			}
 
-			server.Connections = append(server.Connections, conn)
-			server.Tokens = append(server.Tokens, token)
+			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
-			server.OnConnectFunc(conn)
+			server.OnConnectFunc(Connection{Connection: conn, Token: token})
 			server.SendData(conn, "token", []byte(token))
 			continue
 		}
@@ -174,23 +201,27 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
 		for _, event := range server.PossibleEvents {
 			if event == pkg.Event {
-				server.Events[pkg.Event](pkg.Data, conn)
-				break
+				for _, v := range server.Connections {
+					if v.Token == pkg.Token {
+						server.Events[pkg.Event](pkg.Data, v)
+						break
+					}
+				}
 			}
 		}
 	}
 }
 
-func (server *Server) On(event string, callback func([]byte, net.Conn)) {
+func (server *Server) On(event string, callback func([]byte, Connection)) {
 	server.PossibleEvents = append(server.PossibleEvents, event)
 	server.Events[event] = callback
 }
 
-func (server *Server) OnConnect(callback func(conn net.Conn)) {
+func (server *Server) OnConnect(callback func(conn Connection)) {
 	server.OnConnectFunc = callback
 }
 
-func (server *Server) OnDisconnect(callback func(conn net.Conn)) {
+func (server *Server) OnDisconnect(callback func(conn Connection)) {
 	server.OnDisconnectFunc = callback
 }
 
