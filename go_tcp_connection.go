@@ -345,14 +345,6 @@ func (client *Client) SendData(event string, data []byte) {
 
 // ReceiveData is a function that receives data from the server
 func (client *Client) ReceiveData() {
-	// Connect back to the server
-	conn, err := net.Dial("tcp", client.Address)
-	if err != nil {
-		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
-	}
-	// Save the connection
-	client.Connection = conn
-
 	// Read the data
 	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
@@ -360,6 +352,15 @@ func (client *Client) ReceiveData() {
 		return
 	}
 	data = data[:n]
+
+	// Connect back to the server
+	conn, errc := net.Dial("tcp", client.Address)
+	if errc != nil {
+		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
+	}
+	// Save the connection
+	client.Connection = conn
+
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
 		return
