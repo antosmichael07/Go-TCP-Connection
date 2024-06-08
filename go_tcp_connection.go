@@ -46,9 +46,7 @@ type Package struct {
 	Data  []byte
 }
 
-func (pkg Package) ToByte() (bool, []byte) {
-	logger := lgr.NewLogger("TCP")
-
+func (pkg Package) ToByte(logger lgr.Logger) (bool, []byte) {
 	data, err := json.Marshal(pkg)
 	if err != nil {
 		logger.Log(lgr.Error, "Error marshaling package: %s", err)
@@ -59,12 +57,15 @@ func (pkg Package) ToByte() (bool, []byte) {
 }
 
 func NewServer(address string) Server {
+	logger := lgr.NewLogger("TCP")
+	logger.Output.File = false
+
 	return Server{
 		Connections:      []Connection{},
 		Listener:         nil,
 		Address:          address,
-		Logger:           lgr.NewLogger("TCP"),
-		Events:           make(map[string]func([]byte, Connection)),
+		Logger:           logger,
+		Events:           map[string]func([]byte, Connection){},
 		PossibleEvents:   []string{},
 		ShouldStop:       false,
 		OnConnectFunc:    func(conn Connection) {},
@@ -75,11 +76,14 @@ func NewServer(address string) Server {
 }
 
 func NewClient(address string) Client {
+	logger := lgr.NewLogger("TCP")
+	logger.Output.File = false
+
 	return Client{
 		Connection:     nil,
 		Address:        address,
-		Logger:         lgr.NewLogger("TCP"),
-		Events:         make(map[string]func([]byte)),
+		Logger:         logger,
+		Events:         map[string]func([]byte){},
 		PossibleEvents: []string{},
 		ShouldStop:     false,
 		Token:          "",
@@ -101,6 +105,9 @@ func (server *Server) Start() {
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 		}
+		if server.ShouldStop {
+			break
+		}
 
 		go server.ReceiveData(conn)
 	}
@@ -113,7 +120,7 @@ func (server *Server) Stop() {
 }
 
 func (server *Server) SendData(conn net.Conn, event string, data []byte) {
-	can_send, to_send := Package{Event: event, Data: data}.ToByte()
+	can_send, to_send := Package{Event: event, Data: data}.ToByte(server.Logger)
 	if !can_send {
 		server.Logger.Log(lgr.Error, "Error creating package")
 		return
@@ -135,6 +142,9 @@ func (server *Server) ReceiveData(conn net.Conn) {
 	for !server.ShouldStop {
 		data := make([]byte, 16384)
 		n, err := conn.Read(data)
+		if server.ShouldStop {
+			break
+		}
 		data = data[:n]
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
@@ -188,7 +198,9 @@ func (server *Server) ReceiveData(conn net.Conn) {
 
 			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
-			server.OnConnectFunc(Connection{Connection: conn, Token: token})
+			if server.IsOnConnect {
+				server.OnConnectFunc(Connection{Connection: conn, Token: token})
+			}
 			server.SendData(conn, "token", []byte(token))
 			continue
 		}
@@ -219,10 +231,12 @@ func (server *Server) On(event string, callback func([]byte, Connection)) {
 
 func (server *Server) OnConnect(callback func(conn Connection)) {
 	server.OnConnectFunc = callback
+	server.IsOnConnect = true
 }
 
 func (server *Server) OnDisconnect(callback func(conn Connection)) {
 	server.OnDisconnectFunc = callback
+	server.IsOnDisconnect = true
 }
 
 func (client *Client) Connect() {
@@ -238,7 +252,9 @@ func (client *Client) Connect() {
 	client.On("token", func(data []byte) {
 		client.Logger.Log(lgr.Info, "Token received: %s", data)
 		client.Token = string(data)
-		go client.OnConnectFunc()
+		if client.IsOnConnect {
+			go client.OnConnectFunc()
+		}
 	})
 
 	client.On("error", func(data []byte) {
@@ -253,7 +269,7 @@ func (client *Client) Disconnect() {
 }
 
 func (client *Client) SendData(event string, data []byte) {
-	can_send, to_send := Package{Token: client.Token, Event: event, Data: data}.ToByte()
+	can_send, to_send := Package{Token: client.Token, Event: event, Data: data}.ToByte(client.Logger)
 	if !can_send {
 		client.Logger.Log(lgr.Error, "Error creating package")
 		return
@@ -268,6 +284,9 @@ func (client *Client) SendData(event string, data []byte) {
 func (client *Client) ReceiveData() {
 	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
+	if client.ShouldStop {
+		return
+	}
 	data = data[:n]
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
@@ -304,4 +323,5 @@ func (client *Client) Listen() {
 
 func (client *Client) OnConnect(callback func()) {
 	client.OnConnectFunc = callback
+	client.IsOnConnect = true
 }
