@@ -192,8 +192,6 @@ func (server *Server) ReceiveData(conn net.Conn) {
 					}
 				}
 			}
-			// Close the connection
-			conn.Close()
 			// Remove the connection from the connections list
 			for i, v := range server.Connections {
 				if v.Connection == conn {
@@ -202,6 +200,8 @@ func (server *Server) ReceiveData(conn net.Conn) {
 					break
 				}
 			}
+			// Close the connection
+			conn.Close()
 			return
 		}
 
@@ -241,12 +241,12 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			// Add the connection to the connections list
 			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
+			// Send the token to the client
+			server.SendData(conn, "token", []byte(token))
 			// Call the OnConnect function
 			if server.IsOnConnect {
 				server.OnConnectFunc(Connection{Connection: conn, Token: token})
 			}
-			// Send the token to the client
-			server.SendData(conn, "token", []byte(token))
 			continue
 		}
 		// If the token is invalid, send an error
