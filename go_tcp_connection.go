@@ -352,15 +352,6 @@ func (client *Client) ReceiveData() {
 		return
 	}
 	data = data[:n]
-
-	// Connect back to the server
-	conn, errc := net.Dial("tcp", client.Address)
-	if errc != nil {
-		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
-	}
-	// Save the connection
-	client.Connection = conn
-
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
 		return
@@ -379,6 +370,13 @@ func (client *Client) ReceiveData() {
 	for _, event := range client.PossibleEvents {
 		if event == pkg.Event {
 			client.Events[pkg.Event](pkg.Data)
+			// Connect back to the server
+			conn, err := net.Dial("tcp", client.Address)
+			if err != nil {
+				client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
+			}
+			// Save the connection
+			client.Connection = conn
 			break
 		}
 	}
