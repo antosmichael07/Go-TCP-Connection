@@ -199,7 +199,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			}
 			// Close the connection
 			conn.Close()
-			return
+			continue
 		}
 
 		// Unmarshal the data
@@ -208,7 +208,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		if err != nil {
 			server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
 			server.SendData(conn, "error", []byte("Invalid data sent"))
-			return
+			continue
 		}
 
 		// Check if the token is valid
@@ -244,13 +244,13 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			if server.IsOnConnect {
 				server.OnConnectFunc(Connection{Connection: conn, Token: token})
 			}
-			return
+			continue
 		}
 		// If the token is invalid, send an error
 		if !is_token {
 			server.Logger.Log(lgr.Warning, "Invalid token: %s", pkg.Token)
 			server.SendData(conn, "error", []byte("Invalid token"))
-			return
+			continue
 		}
 
 		// If the event is valid, call the function that is associated with the event
