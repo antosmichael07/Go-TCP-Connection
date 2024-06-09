@@ -300,7 +300,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			if event == pkg.Event {
 				for _, v := range server.Connections {
 					if v.Token == pkg.Token {
-						server.Events[pkg.Event](pkg.Data, v)
+						go server.Events[pkg.Event](pkg.Data, v)
 						break
 					}
 				}
