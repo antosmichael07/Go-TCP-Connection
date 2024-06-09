@@ -35,8 +35,9 @@ type Server struct {
 
 // Connection is a struct that contains the connection and the token of the client
 type Connection struct {
-	Connection net.Conn
-	Token      string
+	Connection   net.Conn
+	Token        string
+	ReceivedLast bool
 }
 
 type Client struct {
@@ -126,6 +127,16 @@ func (server *Server) Start() {
 	server.Listener = listener
 	server.Logger.Log(lgr.Info, "Server is listening on %s", server.Address)
 
+	// Event on data receivment
+	server.On("received-last-data", func(data []byte, conn Connection) {
+		for i, v := range server.Connections {
+			if v.Token == conn.Token {
+				server.Connections[i].ReceivedLast = true
+				break
+			}
+		}
+	})
+
 	// Start receiving data
 	for !server.ShouldStop {
 		conn, err := server.Listener.Accept()
@@ -149,18 +160,25 @@ func (server *Server) Stop() {
 
 // SendData is a function that sends data to a specific connectionl, with the given event name, and data
 func (server *Server) SendData(conn net.Conn, event string, data []byte) {
-	// Convert the package to a byte array
-	can_send, to_send := Package{Event: event, Data: data}.ToByte(server.Logger)
-	if !can_send {
-		server.Logger.Log(lgr.Error, "Error creating package")
-		return
+	for _, v := range server.Connections {
+		if v.Connection == conn && v.ReceivedLast {
+			// Convert the package to a byte array
+			can_send, to_send := Package{Event: event, Data: data}.ToByte(server.Logger)
+			if !can_send {
+				server.Logger.Log(lgr.Error, "Error creating package")
+				return
+			}
+			// Send the data
+			_, err := conn.Write(to_send)
+			if err != nil {
+				server.Logger.Log(lgr.Error, "Error sending data: %s", err)
+			}
+			// Set the ReceivedLast to false
+			v.ReceivedLast = false
+
+			server.Logger.Log(lgr.Info, "Data sent with the event name: %s", event)
+		}
 	}
-	// Send the data
-	_, err := conn.Write(to_send)
-	if err != nil {
-		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
-	}
-	server.Logger.Log(lgr.Info, "Data sent with the event name: %s", event)
 }
 
 // SendDataToAll is a function that sends data to all the connections, with the given event name, and data
@@ -364,6 +382,7 @@ func (client *Client) ReceiveData() {
 	for _, event := range client.PossibleEvents {
 		if event == pkg.Event {
 			client.Events[pkg.Event](pkg.Data)
+			client.SendData("received-last-data", []byte{})
 			break
 		}
 	}
