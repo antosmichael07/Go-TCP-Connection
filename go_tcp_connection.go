@@ -38,6 +38,7 @@ type Connection struct {
 	Connection   net.Conn
 	Token        string
 	ReceivedLast bool
+	Queue        []Package
 }
 
 type Client struct {
@@ -138,16 +139,28 @@ func (server *Server) Start() {
 	})
 
 	// Start receiving data
-	for !server.ShouldStop {
-		conn, err := server.Listener.Accept()
-		if err != nil {
-			server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
-		}
-		if server.ShouldStop {
-			break
-		}
+	go func() {
+		for !server.ShouldStop {
+			conn, err := server.Listener.Accept()
+			if err != nil {
+				server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
+			}
+			if server.ShouldStop {
+				break
+			}
 
-		go server.ReceiveData(conn)
+			go server.ReceiveData(conn)
+		}
+	}()
+
+	// Start sending data
+	for !server.ShouldStop {
+		for _, conn := range server.Connections {
+			if len(conn.Queue) != 0 && conn.ReceivedLast {
+				server.ActuallySendData(conn.Connection, conn.Queue[0].Event, conn.Queue[0].Data)
+				conn.Queue = conn.Queue[1:]
+			}
+		}
 	}
 }
 
@@ -158,8 +171,18 @@ func (server *Server) Stop() {
 	server.Logger.Log(lgr.Info, "Server stopped")
 }
 
-// SendData is a function that sends data to a specific connectionl, with the given event name, and data
+// SendData to queue data to be sent to a specific connection with the given event name, and data
 func (server *Server) SendData(conn net.Conn, event string, data []byte) {
+	for i, v := range server.Connections {
+		if v.Connection == conn {
+			server.Connections[i].Queue = append(server.Connections[i].Queue, Package{Event: event, Data: data})
+			break
+		}
+	}
+}
+
+// ActuallySendData is a function that sends data to a specific connectionl, with the given event name, and data
+func (server *Server) ActuallySendData(conn net.Conn, event string, data []byte) {
 	for _, v := range server.Connections {
 		if v.Connection == conn && v.ReceivedLast {
 			// Convert the package to a byte array
@@ -363,6 +386,8 @@ func (client *Client) ReceiveData() {
 	// Read the data
 	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
+	// Tell the server that the data was received
+	client.SendData("received-last-data", []byte{})
 	data = data[:n]
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
@@ -382,7 +407,6 @@ func (client *Client) ReceiveData() {
 	for _, event := range client.PossibleEvents {
 		if event == pkg.Event {
 			client.Events[pkg.Event](pkg.Data)
-			client.SendData("received-last-data", []byte{})
 			break
 		}
 	}
