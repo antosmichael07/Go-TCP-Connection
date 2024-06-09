@@ -176,98 +176,97 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		// Read the data
 		data := make([]byte, 16384)
 		n, err := conn.Read(data)
-		if server.ShouldStop {
-			break
-		}
-		data = data[:n]
-		// If there is an error, close the connection, remove it from the connections and call the OnDisconnect function
-		if err != nil {
-			server.Logger.Log(lgr.Error, "Error reading data: %s", err)
-			// Call the OnDisconnect function
-			if server.IsOnDisconnect {
-				for _, v := range server.Connections {
+		go func(data []byte, n int, err error) {
+			data = data[:n]
+			// If there is an error, close the connection, remove it from the connections and call the OnDisconnect function
+			if err != nil {
+				server.Logger.Log(lgr.Error, "Error reading data: %s", err)
+				// Call the OnDisconnect function
+				if server.IsOnDisconnect {
+					for _, v := range server.Connections {
+						if v.Connection == conn {
+							server.OnDisconnectFunc(v)
+							break
+						}
+					}
+				}
+				// Remove the connection from the connections list
+				for i, v := range server.Connections {
 					if v.Connection == conn {
-						server.OnDisconnectFunc(v)
+						server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
+						server.Logger.Log(lgr.Info, "Connection terminated")
 						break
 					}
 				}
+				// Close the connection
+				conn.Close()
+				return
 			}
-			// Remove the connection from the connections list
-			for i, v := range server.Connections {
-				if v.Connection == conn {
-					server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
-					server.Logger.Log(lgr.Info, "Connection terminated")
+
+			// Unmarshal the data
+			pkg := Package{}
+			err = json.Unmarshal(data, &pkg)
+			if err != nil {
+				server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+				server.SendData(conn, "error", []byte("Invalid data sent"))
+				return
+			}
+
+			// Check if the token is valid
+			is_token := false
+			for _, v := range server.Connections {
+				if v.Token == pkg.Token {
+					is_token = true
 					break
 				}
 			}
-			// Close the connection
-			conn.Close()
-			return
-		}
-
-		// Unmarshal the data
-		pkg := Package{}
-		err = json.Unmarshal(data, &pkg)
-		if err != nil {
-			server.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
-			server.SendData(conn, "error", []byte("Invalid data sent"))
-			continue
-		}
-
-		// Check if the token is valid
-		is_token := false
-		for _, v := range server.Connections {
-			if v.Token == pkg.Token {
-				is_token = true
-				break
-			}
-		}
-		// If the event is connect, create a token and add the connection to the connections list
-		if pkg.Event == "connect" && !is_token {
-			// Create a token
-			token := ""
-			for token == "" {
-				for i := 0; i < 32; i++ {
-					token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+			// If the event is connect, create a token and add the connection to the connections list
+			if pkg.Event == "connect" && !is_token {
+				// Create a token
+				token := ""
+				for token == "" {
+					for i := 0; i < 32; i++ {
+						token = fmt.Sprintf("%s%d", token, rand.Intn(9))
+					}
+					for _, v := range server.Connections {
+						if v.Token == token {
+							token = ""
+							break
+						}
+					}
 				}
-				for _, v := range server.Connections {
-					if v.Token == token {
-						token = ""
-						break
+
+				// Add the connection to the connections list
+				server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
+				server.Logger.Log(lgr.Info, "New connection: %s", token)
+				// Send the token to the client
+				server.SendData(conn, "token", []byte(token))
+				// Call the OnConnect function
+				if server.IsOnConnect {
+					server.OnConnectFunc(Connection{Connection: conn, Token: token})
+				}
+				return
+			}
+			// If the token is invalid, send an error
+			if !is_token {
+				server.Logger.Log(lgr.Warning, "Invalid token: %s", pkg.Token)
+				server.SendData(conn, "error", []byte("Invalid token"))
+				return
+			}
+
+			// If the event is valid, call the function that is associated with the event
+			server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
+			for _, event := range server.PossibleEvents {
+				if event == pkg.Event {
+					for _, v := range server.Connections {
+						if v.Token == pkg.Token {
+							server.Events[pkg.Event](pkg.Data, v)
+							break
+						}
 					}
 				}
 			}
-
-			// Add the connection to the connections list
-			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
-			server.Logger.Log(lgr.Info, "New connection: %s", token)
-			// Send the token to the client
-			server.SendData(conn, "token", []byte(token))
-			// Call the OnConnect function
-			if server.IsOnConnect {
-				server.OnConnectFunc(Connection{Connection: conn, Token: token})
-			}
-			continue
-		}
-		// If the token is invalid, send an error
-		if !is_token {
-			server.Logger.Log(lgr.Warning, "Invalid token: %s", pkg.Token)
-			server.SendData(conn, "error", []byte("Invalid token"))
-			continue
-		}
-
-		// If the event is valid, call the function that is associated with the event
-		server.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
-		for _, event := range server.PossibleEvents {
-			if event == pkg.Event {
-				for _, v := range server.Connections {
-					if v.Token == pkg.Token {
-						server.Events[pkg.Event](pkg.Data, v)
-						break
-					}
-				}
-			}
-		}
+		}(data, n, err)
 	}
 }
 
@@ -348,31 +347,30 @@ func (client *Client) ReceiveData() {
 	// Read the data
 	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
-	if client.ShouldStop {
-		return
-	}
-	data = data[:n]
-	if err != nil {
-		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
-		return
-	}
-
-	// Unmarshal the data
-	pkg := Package{}
-	err = json.Unmarshal(data, &pkg)
-	if err != nil {
-		client.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
-		return
-	}
-
-	// If the event is valid, call the function that is associated with the event
-	client.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
-	for _, event := range client.PossibleEvents {
-		if event == pkg.Event {
-			go client.Events[pkg.Event](pkg.Data)
-			break
+	go func(data []byte, n int, err error) {
+		data = data[:n]
+		if err != nil {
+			client.Logger.Log(lgr.Error, "Error reading data: %s", err)
+			return
 		}
-	}
+
+		// Unmarshal the data
+		pkg := Package{}
+		err = json.Unmarshal(data, &pkg)
+		if err != nil {
+			client.Logger.Log(lgr.Error, "Error unmarshaling package: %s", err)
+			return
+		}
+
+		// If the event is valid, call the function that is associated with the event
+		client.Logger.Log(lgr.Info, "Data received with an event name: %s", pkg.Event)
+		for _, event := range client.PossibleEvents {
+			if event == pkg.Event {
+				client.Events[pkg.Event](pkg.Data)
+				break
+			}
+		}
+	}(data, n, err)
 }
 
 // On is a function that adds an event to the client
