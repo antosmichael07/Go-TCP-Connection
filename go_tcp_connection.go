@@ -240,7 +240,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			}
 			// Close the connection
 			conn.Close()
-			continue
+			return
 		}
 
 		// Unmarshal the data
