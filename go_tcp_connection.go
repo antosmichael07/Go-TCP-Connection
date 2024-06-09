@@ -158,11 +158,7 @@ func (server *Server) Start() {
 		for _, conn := range server.Connections {
 			if len(conn.Queue) != 0 && conn.ReceivedLast {
 				server.ActuallySendData(conn.Connection, conn.Queue[0].Event, conn.Queue[0].Data)
-				if len(conn.Queue) > 1 {
-					conn.Queue = conn.Queue[1:]
-				} else {
-					conn.Queue = []Package{}
-				}
+				server.Connections[0].Queue = server.Connections[0].Queue[1:]
 			}
 		}
 	}
