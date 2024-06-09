@@ -157,6 +157,7 @@ func (server *Server) Start() {
 	for !server.ShouldStop {
 		for _, conn := range server.Connections {
 			if len(conn.Queue) != 0 && conn.ReceivedLast {
+				server.Logger.Log(lgr.Info, "Data sent with the event name: %s", conn.Queue[0].Event)
 				server.ActuallySendData(conn.Connection, conn.Queue[0].Event, conn.Queue[0].Data)
 				conn.Queue = conn.Queue[1:]
 			}
@@ -277,7 +278,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			}
 
 			// Add the connection to the connections list
-			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token})
+			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: []Package{}})
 			server.Logger.Log(lgr.Info, "New connection: %s", token)
 			// Send the token to the client
 			server.SendData(conn, "token", []byte(token))
