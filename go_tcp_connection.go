@@ -80,8 +80,7 @@ func (pkg Package) ToByte(logger lgr.Logger) (bool, []byte) {
 
 // NewServer is a function that creates a new server with the given address
 func NewServer(address string) Server {
-	logger := lgr.NewLogger("TCP")
-	logger.Output.File = false
+	logger, _ := lgr.NewLogger("TCP", "", false)
 
 	return Server{
 		Connections:      []Connection{},
@@ -100,8 +99,7 @@ func NewServer(address string) Server {
 
 // NewClient is a function that creates a new client with the given address
 func NewClient(address string) Client {
-	logger := lgr.NewLogger("TCP")
-	logger.Output.File = false
+	logger, _ := lgr.NewLogger("TCP", "", false)
 
 	return Client{
 		Connection:     nil,
