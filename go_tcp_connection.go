@@ -365,7 +365,8 @@ func (client *Client) Connect() {
 	client.Logger.Log(lgr.Info, "Connected to server")
 
 	// Send the connect event
-	client.SendData(event_connect, []byte{})
+	pkg := Package{Event: event_connect, Data: []byte{}}.ToByte(client.Logger)
+	client.SendData(event_connect, pkg)
 
 	// Receive the token
 	client.On(event_token, func(data []byte) {
