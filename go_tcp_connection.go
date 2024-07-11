@@ -78,9 +78,10 @@ const (
 // ToByte is a function that converts the package to a byte array to be sent
 func (pkg Package) ToByte(logger lgr.Logger) (data []byte) {
 	data = make([]byte, 74+len(pkg.Data))
+	size := uint64(len(pkg.Data))
 
 	for i := 0; i < 8; i++ {
-		data[i] = byte(pkg.Size >> (8 * i))
+		data[i] = byte(size >> (8 * i))
 	}
 	for i := 0; i < 64; i++ {
 		data[i+8] = pkg.Token[i]
@@ -281,7 +282,6 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		pkg.FromByte(data, server.Logger)
 
 		if pkg.Size != uint64(len(pkg.Data)) {
-			fmt.Println(pkg.Size, len(pkg.Data), data)
 			server.Logger.Log(lgr.Error, "Invalid data sent")
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
@@ -431,6 +431,10 @@ func (client *Client) ReceiveData() {
 	// Decode the data
 	pkg := Package{}
 	pkg.FromByte(data, client.Logger)
+	if pkg.Size != uint64(len(pkg.Data)) {
+		client.Logger.Log(lgr.Error, "Invalid data sent")
+		return
+	}
 
 	// If the event is valid, call the function that is associated with the event
 	client.Logger.Log(lgr.Info, "Data received with an event name: %v, data: %v", pkg.Event, data)
