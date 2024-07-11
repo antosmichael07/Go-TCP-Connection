@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"fmt"
 	"math/rand"
 	"net"
 	"os"
@@ -274,16 +273,14 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		// Decode the data
 		pkg := Package{}
 		if len(data) < 74 {
-			fmt.Println(data)
-			server.Logger.Log(lgr.Error, "Invalid data sent")
+			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
 		}
 		pkg.FromByte(data, server.Logger)
 
 		if pkg.Size != uint64(len(pkg.Data)) {
-			fmt.Println(pkg.Size, len(pkg.Data), data)
-			server.Logger.Log(lgr.Error, "Invalid data sent")
+			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
 		}
@@ -375,8 +372,7 @@ func (client *Client) Connect() {
 	client.Logger.Log(lgr.Info, "Connected to server")
 
 	// Send the connect event
-	pkg := Package{Event: event_connect, Data: []byte{}}.ToByte(client.Logger)
-	client.SendData(event_connect, pkg)
+	client.SendData(event_connect, []byte{})
 
 	// Receive the token
 	client.On(event_token, func(data []byte) {
