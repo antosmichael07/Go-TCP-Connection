@@ -281,6 +281,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		pkg.FromByte(data, server.Logger)
 
 		if pkg.Size != uint64(len(pkg.Data)) {
+			fmt.Println(pkg.Size, len(pkg.Data), data)
 			server.Logger.Log(lgr.Error, "Invalid data sent")
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
