@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"fmt"
 	"math/rand"
 	"net"
 	"os"
@@ -274,15 +273,13 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		// Decode the data
 		pkg := Package{}
 		if len(data) < 74 {
-			fmt.Println(data)
 			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
 		}
 		pkg.FromByte(data, server.Logger)
 
-		if pkg.Size != uint64(len(pkg.Data)) {
-			fmt.Println(pkg.Size, len(pkg.Data), pkg.Data, data)
+		if pkg.Size != uint64(len(data)) {
 			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
