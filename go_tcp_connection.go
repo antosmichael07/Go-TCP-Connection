@@ -18,7 +18,7 @@ type Server struct {
 	// Logger is the logger of the server, can be customized (https://github.com/antosmichael07/Go-Logger)
 	Logger lgr.Logger
 	// Here are the events that the server can handle
-	Events         []func([]byte, Connection)
+	Events         [65536]func([]byte, Connection)
 	PossibleEvents []uint16
 	// ShouldStop is a boolean that is used to stop the server
 	ShouldStop bool
@@ -48,7 +48,7 @@ type Client struct {
 	// Logger is the logger of the client, can be customized (https://github.com/antosmichael07/Go-Logger)
 	Logger lgr.Logger
 	// Here are the events that the client can handle
-	Events         []func([]byte)
+	Events         [65536]func([]byte)
 	PossibleEvents []uint16
 	// ShouldStop is a boolean that is used to stop the client
 	ShouldStop bool
@@ -119,7 +119,7 @@ func NewServer(address string) Server {
 		Listener:         nil,
 		Address:          address,
 		Logger:           logger,
-		Events:           []func([]byte, Connection){},
+		Events:           [65536]func([]byte, Connection){},
 		PossibleEvents:   []uint16{},
 		ShouldStop:       false,
 		OnConnectFunc:    func(conn Connection) {},
@@ -137,7 +137,7 @@ func NewClient(address string) Client {
 		Connection:     nil,
 		Address:        address,
 		Logger:         logger,
-		Events:         []func([]byte){},
+		Events:         [65536]func([]byte){},
 		PossibleEvents: []uint16{},
 		ShouldStop:     false,
 		Token:          [64]byte{},
