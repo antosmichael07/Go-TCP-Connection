@@ -428,7 +428,7 @@ func (client *Client) ReceiveData() {
 	// Decode the data
 	pkg := Package{}
 	pkg.FromByte(data, client.Logger)
-	if pkg.Size != uint64(len(pkg.Data)) {
+	if pkg.Size != uint64(len(data)) {
 		client.Logger.Log(lgr.Error, "Invalid data sent")
 		return
 	}
