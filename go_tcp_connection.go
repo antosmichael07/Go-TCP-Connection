@@ -192,7 +192,7 @@ func (server *Server) Start() {
 				server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 			}
 
-			go server.ReceiveData(&conn)
+			go server.ReceiveData(conn)
 		}
 	}()
 
@@ -240,11 +240,11 @@ func (server *Server) SendDataToAll(event uint16, data *[]byte) {
 }
 
 // ReceiveData is a function that receives data from a specific connection
-func (server *Server) ReceiveData(conn *net.Conn) {
+func (server *Server) ReceiveData(conn net.Conn) {
 	for !server.ShouldStop {
 		// Read the data
 		data := make([]byte, 16384)
-		n, err := (*conn).Read(data)
+		n, err := conn.Read(data)
 		data = data[:n]
 		// If there is an error, close the connection, remove it from the connections and call the OnDisconnect function
 		if err != nil {
@@ -252,7 +252,7 @@ func (server *Server) ReceiveData(conn *net.Conn) {
 			// Call the OnDisconnect function
 			if server.IsOnDisconnect {
 				for i := range server.Connections {
-					if server.Connections[i].Connection == *conn {
+					if server.Connections[i].Connection == conn {
 						server.OnDisconnectFunc(&server.Connections[i])
 						break
 					}
@@ -260,14 +260,14 @@ func (server *Server) ReceiveData(conn *net.Conn) {
 			}
 			// Remove the connection from the connections list
 			for i := range server.Connections {
-				if server.Connections[i].Connection == *conn {
+				if server.Connections[i].Connection == conn {
 					server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
 					server.Logger.Log(lgr.Info, "Connection terminated")
 					break
 				}
 			}
 			// Close the connection
-			(*conn).Close()
+			conn.Close()
 			return
 		}
 
@@ -310,15 +310,14 @@ func (server *Server) ReceiveData(conn *net.Conn) {
 			}
 
 			// Add the connection to the connections list
-			connection := Connection{Connection: *conn, Token: token, ReceivedLast: true, Queue: [][]byte{}}
-			server.Connections = append(server.Connections, connection)
+			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: [][]byte{}})
 			server.Logger.Log(lgr.Info, "New connection: %v", token)
 			// Send the token to the client
 			token_slice := []byte(token[:])
-			server.SendData(&connection, event_token, &token_slice)
+			server.SendData(&server.Connections[len(server.Connections)], event_token, &token_slice)
 			// Call the OnConnect function
 			if server.IsOnConnect {
-				server.OnConnectFunc(&connection)
+				server.OnConnectFunc(&server.Connections[len(server.Connections)])
 			}
 			continue
 		}
