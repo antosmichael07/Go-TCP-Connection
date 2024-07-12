@@ -374,6 +374,8 @@ func (client *Client) Connect() {
 		client.Logger.Log(lgr.Info, "Token received: %v", data)
 		// Save the token
 		client.Token = [64]byte(data)
+		// Tell the server that the data was received
+		client.SendData(event_last_data_received, []byte{})
 		// Call the OnConnect function
 		if client.IsOnConnect {
 			go client.OnConnectFunc()
