@@ -185,10 +185,10 @@ func (server *Server) Start() {
 
 	// Start sending data
 	for !server.ShouldStop {
-		for _, conn := range server.Connections {
+		for i, conn := range server.Connections {
 			if len(conn.Queue) != 0 && conn.ReceivedLast {
 				server.ActuallySendData(conn.Connection, conn.Queue[0])
-				server.Connections[0].Queue = server.Connections[0].Queue[1:]
+				server.Connections[i].Queue = server.Connections[i].Queue[1:]
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func (server *Server) Stop() {
 func (server *Server) SendData(conn net.Conn, event uint16, data []byte) {
 	for i, v := range server.Connections {
 		if v.Connection == conn {
-			server.Connections[i].Queue = append(server.Connections[i].Queue, Package{Event: event, Data: data}.ToByte(server.Connections[i].Token))
+			server.Connections[i].Queue = append(server.Connections[i].Queue, Package{Event: event, Data: data}.ToByte([64]byte{}))
 			break
 		}
 	}
