@@ -199,7 +199,7 @@ func (server *Server) Start() {
 
 	// Start sending data
 	for !server.ShouldStop {
-		for i := range server.Connections {
+		for i := 0; i < len(server.Connections); i++ {
 			if server.Connections[i].ShouldClose {
 				server.Connections[i].Connection.Close()
 				server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
