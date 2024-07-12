@@ -37,6 +37,7 @@ type Connection struct {
 	Token        [64]byte
 	ReceivedLast bool
 	Queue        [][]byte
+	ShouldClose  bool
 }
 
 type Client struct {
@@ -199,6 +200,12 @@ func (server *Server) Start() {
 	// Start sending data
 	for !server.ShouldStop {
 		for i := range server.Connections {
+			if server.Connections[i].ShouldClose {
+				server.Connections[i].Connection.Close()
+				server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
+				server.Logger.Log(lgr.Info, "Connection terminated")
+				continue
+			}
 			if server.Connections[i].Queue != nil && len(server.Connections[i].Queue) != 0 && server.Connections[i].ReceivedLast {
 				server.ActuallySendData(&server.Connections[i], &server.Connections[i].Queue[0])
 				server.Connections[i].Queue = server.Connections[i].Queue[1:]
@@ -261,8 +268,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			// Remove the connection from the connections list
 			for i := range server.Connections {
 				if server.Connections[i].Connection == conn {
-					server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
-					server.Logger.Log(lgr.Info, "Connection terminated")
+					server.Connections[i].ShouldClose = true
 					break
 				}
 			}
