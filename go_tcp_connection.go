@@ -314,10 +314,10 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			server.Logger.Log(lgr.Info, "New connection: %v", token)
 			// Send the token to the client
 			token_slice := []byte(token[:])
-			server.SendData(&server.Connections[len(server.Connections)], event_token, &token_slice)
+			server.SendData(&server.Connections[len(server.Connections)-1], event_token, &token_slice)
 			// Call the OnConnect function
 			if server.IsOnConnect {
-				server.OnConnectFunc(&server.Connections[len(server.Connections)])
+				server.OnConnectFunc(&server.Connections[len(server.Connections)-1])
 			}
 			continue
 		}
