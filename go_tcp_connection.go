@@ -3,7 +3,6 @@ package tcp
 import (
 	"math/rand"
 	"net"
-	"os"
 
 	lgr "github.com/antosmichael07/Go-Logger"
 )
@@ -37,7 +36,7 @@ type Connection struct {
 	Connection   net.Conn
 	Token        [64]byte
 	ReceivedLast bool
-	Queue        []Package
+	Queue        [][]byte
 }
 
 type Client struct {
@@ -75,7 +74,7 @@ const (
 )
 
 // ToByte is a function that converts the package to a byte array to be sent
-func (pkg Package) ToByte(logger lgr.Logger) (data []byte) {
+func (pkg Package) ToByte(token [64]byte) (data []byte) {
 	data = make([]byte, 74+len(pkg.Data))
 	size := uint64(74 + len(pkg.Data))
 
@@ -83,7 +82,7 @@ func (pkg Package) ToByte(logger lgr.Logger) (data []byte) {
 		data[i] = byte(size >> (8 * i))
 	}
 	for i := 0; i < 64; i++ {
-		data[i+8] = pkg.Token[i]
+		data[i+8] = token[i]
 	}
 	for i := 0; i < 2; i++ {
 		data[i+72] = byte(pkg.Event >> (8 * i))
@@ -96,7 +95,7 @@ func (pkg Package) ToByte(logger lgr.Logger) (data []byte) {
 }
 
 // FromByte is a function that converts the byte array to a package
-func (pkg *Package) FromByte(data []byte, logger lgr.Logger) {
+func (pkg *Package) FromByte(data []byte) {
 	pkg.Size = 0
 	for i := 0; i < 8; i++ {
 		pkg.Size |= uint64(data[i]) << (8 * i)
@@ -173,11 +172,11 @@ func (server *Server) Start() {
 	go func() {
 		for !server.ShouldStop {
 			conn, err := server.Listener.Accept()
-			if err != nil {
-				server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
-			}
 			if server.ShouldStop {
 				break
+			}
+			if err != nil {
+				server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 			}
 
 			go server.ReceiveData(conn)
@@ -188,7 +187,7 @@ func (server *Server) Start() {
 	for !server.ShouldStop {
 		for _, conn := range server.Connections {
 			if len(conn.Queue) != 0 && conn.ReceivedLast {
-				server.ActuallySendData(conn.Connection, conn.Queue[0].Event, conn.Queue[0].Data)
+				server.ActuallySendData(conn.Connection, conn.Queue[0])
 				server.Connections[0].Queue = server.Connections[0].Queue[1:]
 			}
 		}
@@ -206,27 +205,25 @@ func (server *Server) Stop() {
 func (server *Server) SendData(conn net.Conn, event uint16, data []byte) {
 	for i, v := range server.Connections {
 		if v.Connection == conn {
-			server.Connections[i].Queue = append(server.Connections[i].Queue, Package{Event: event, Data: data})
+			server.Connections[i].Queue = append(server.Connections[i].Queue, Package{Event: event, Data: data}.ToByte(server.Connections[i].Token))
 			break
 		}
 	}
 }
 
 // ActuallySendData is a function that sends data to a specific connectionl, with the given event name, and data
-func (server *Server) ActuallySendData(conn net.Conn, event uint16, data []byte) {
-	for _, v := range server.Connections {
+func (server *Server) ActuallySendData(conn net.Conn, data []byte) {
+	for i, v := range server.Connections {
 		if v.Connection == conn && v.ReceivedLast {
-			// Convert the package to a byte array
-			to_send := Package{Event: event, Data: data, Size: uint64(len(data))}.ToByte(server.Logger)
 			// Send the data
-			_, err := conn.Write(to_send)
+			_, err := conn.Write(data)
 			if err != nil {
 				server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 			}
 			// Set the ReceivedLast to false
-			v.ReceivedLast = false
+			server.Connections[i].ReceivedLast = false
 
-			server.Logger.Log(lgr.Info, "Data sent with the event name: %v", event)
+			server.Logger.Log(lgr.Info, "Data sent with the event name: %v", uint16(data[72])|(uint16(data[73])<<8))
 		}
 	}
 }
@@ -271,19 +268,20 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		}
 
 		// Decode the data
-		pkg := Package{}
 		if len(data) < 74 {
-			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
+			server.Logger.Log(lgr.Error, "Invalid data received: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
 		}
-		pkg.FromByte(data, server.Logger)
+		pkg := Package{}
+		pkg.FromByte(data)
 
-		if pkg.Size != uint64(len(data)) {
-			server.Logger.Log(lgr.Error, "Invalid data sent: %v", data)
+		if pkg.Size < uint64(len(data)) {
+			server.Logger.Log(lgr.Error, "Invalid data received: %v", data)
 			server.SendData(conn, event_error, []byte("Invalid data sent"))
 			continue
 		}
+		pkg.Data = pkg.Data[:pkg.Size-74]
 
 		// Check if the token is valid
 		is_token := false
@@ -310,7 +308,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			}
 
 			// Add the connection to the connections list
-			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: []Package{}})
+			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: [][]byte{}})
 			server.Logger.Log(lgr.Info, "New connection: %v", token)
 			// Send the token to the client
 			server.SendData(conn, event_token, []byte(token[:]))
@@ -371,9 +369,6 @@ func (client *Client) Connect() {
 	client.Connection = conn
 	client.Logger.Log(lgr.Info, "Connected to server")
 
-	// Send the connect event
-	client.SendData(event_connect, []byte{})
-
 	// Receive the token
 	client.On(event_token, func(data []byte) {
 		client.Logger.Log(lgr.Info, "Token received: %v", data)
@@ -387,7 +382,7 @@ func (client *Client) Connect() {
 
 	// Receive the error event
 	client.On(event_error, func(data []byte) {
-		client.Logger.Log(lgr.Error, "Error received: %s", data)
+		client.Logger.Log(lgr.Error, "Error received: %s", string(data))
 	})
 }
 
@@ -396,17 +391,16 @@ func (client *Client) Disconnect() {
 	client.ShouldStop = true
 	client.Connection.Close()
 	client.Logger.Log(lgr.Info, "Connection closed")
-	os.Exit(0)
 }
 
 // SendData is a function that sends data to the server with the given event name, and data
 func (client *Client) SendData(event uint16, data []byte) {
 	// Convert the package to a byte array
-	to_send := Package{Token: client.Token, Event: event, Data: data}.ToByte(client.Logger)
+	to_send := Package{Event: event, Data: data}.ToByte(client.Token)
 	// Send the data
 	_, err := client.Connection.Write(to_send)
 	if err != nil {
-		client.Logger.Log(lgr.Error, "Error sending data: %v", err)
+		client.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	}
 	client.Logger.Log(lgr.Info, "Data sent with the event name: %v", event)
 }
@@ -420,21 +414,22 @@ func (client *Client) ReceiveData() {
 	client.SendData(event_last_data_received, []byte{})
 	data = data[:n]
 	if err != nil {
-		client.Logger.Log(lgr.Error, "Error reading data: %s", err)
+		client.Logger.Log(lgr.Error, "Error reading received data: %s", err)
 		client.Disconnect()
 		return
 	}
 
 	// Decode the data
 	pkg := Package{}
-	pkg.FromByte(data, client.Logger)
-	if pkg.Size != uint64(len(data)) {
-		client.Logger.Log(lgr.Error, "Invalid data sent")
+	pkg.FromByte(data)
+	if pkg.Size < uint64(len(data)) {
+		client.Logger.Log(lgr.Error, "Invalid data received: %v", data)
 		return
 	}
+	pkg.Data = pkg.Data[:pkg.Size-74]
 
 	// If the event is valid, call the function that is associated with the event
-	client.Logger.Log(lgr.Info, "Data received with an event name: %v, data: %v", pkg.Event, data)
+	client.Logger.Log(lgr.Info, "Data received with an event name: %v, data: %v", pkg.Event, pkg.Data)
 	for _, event := range client.PossibleEvents {
 		if event == pkg.Event {
 			client.Events[pkg.Event](pkg.Data)
@@ -453,6 +448,10 @@ func (client *Client) On(event uint16, callback func([]byte)) {
 // Should be called after you have set the events
 func (client *Client) Listen() {
 	client.Logger.Log(lgr.Info, "Started listening")
+
+	// Send the connect event
+	client.SendData(event_connect, []byte{})
+
 	for !client.ShouldStop {
 		client.ReceiveData()
 	}
