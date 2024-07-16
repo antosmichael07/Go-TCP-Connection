@@ -418,8 +418,10 @@ func (client *Client) ReceiveData() {
 	data := make([]byte, 16384)
 	n, err := client.Connection.Read(data)
 	if client.Token != [64]byte{} {
-		// Tell the server that the data was received
-		client.SendData(event_last_data_received, &[]byte{})
+		if !client.ShouldStop {
+			// Tell the server that the data was received
+			client.SendData(event_last_data_received, &[]byte{})
+		}
 	}
 	data = data[:n]
 	if err != nil {
