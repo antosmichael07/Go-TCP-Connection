@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"time"
@@ -371,6 +372,7 @@ func (client *Client) Connect() error {
 	// Connect to the server
 	net_dialer := net.Dialer{Timeout: 10 * time.Second}
 	conn, err := net_dialer.Dial("tcp", client.Address)
+	fmt.Println(conn, err)
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
 		return err
