@@ -39,6 +39,7 @@ type Connection struct {
 	ReceivedLast bool
 	Queue        [][]byte
 	ShouldClose  bool
+	IsOK         bool
 }
 
 type Client struct {
@@ -72,6 +73,7 @@ const (
 	event_last_data_received uint16 = iota
 	event_connect
 	event_token
+	event_are_you_ok
 )
 
 // ToByte is a function that converts the package to a byte array to be sent
@@ -181,6 +183,29 @@ func (server *Server) Start() {
 	server.On(event_last_data_received, func(data *[]byte, conn *Connection) {
 		conn.ReceivedLast = true
 	})
+
+	server.On(event_are_you_ok, func(data *[]byte, conn *Connection) {
+		for i := range server.Connections {
+			if server.Connections[i].Token == conn.Token {
+				server.Connections[i].IsOK = true
+				break
+			}
+		}
+	})
+
+	go func() {
+		for !server.ShouldStop {
+			for i := range server.Connections {
+				if !server.Connections[i].IsOK {
+					server.Connections[i].ShouldClose = true
+					server.Logger.Log(lgr.Info, "Connection terminated")
+				}
+				server.Connections[i].IsOK = false
+				server.SendData(&server.Connections[i], event_are_you_ok, &[]byte{})
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}()
 
 	// Start receiving data
 	go func() {
@@ -390,6 +415,10 @@ func (client *Client) Connect() error {
 		if client.IsOnConnect {
 			go client.OnConnectFunc()
 		}
+	})
+
+	client.On(event_are_you_ok, func(data *[]byte) {
+		client.SendData(event_are_you_ok, &[]byte{})
 	})
 
 	return nil
