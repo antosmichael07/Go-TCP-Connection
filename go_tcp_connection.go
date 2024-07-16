@@ -196,12 +196,14 @@ func (server *Server) Start() {
 	go func() {
 		for !server.ShouldStop {
 			for i := range server.Connections {
-				if !server.Connections[i].IsOK {
-					server.Connections[i].ShouldClose = true
-					server.Logger.Log(lgr.Info, "Connection terminated")
+				if !server.Connections[i].ShouldClose {
+					if !server.Connections[i].IsOK {
+						server.Connections[i].ShouldClose = true
+						server.Logger.Log(lgr.Info, "Connection terminated")
+					}
+					server.Connections[i].IsOK = false
+					server.SendData(&server.Connections[i], event_are_you_ok, &[]byte{})
 				}
-				server.Connections[i].IsOK = false
-				server.SendData(&server.Connections[i], event_are_you_ok, &[]byte{})
 			}
 			time.Sleep(10 * time.Second)
 		}
