@@ -195,7 +195,7 @@ func (server *Server) Start() {
 
 	go func() {
 		for !server.ShouldStop {
-			for i := range server.Connections {
+			for i := 0; i < len(server.Connections); i++ {
 				if !server.Connections[i].ShouldClose {
 					if !server.Connections[i].IsOK {
 						server.Connections[i].ShouldClose = true
@@ -343,7 +343,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 			}
 
 			// Add the connection to the connections list
-			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: [][]byte{}})
+			server.Connections = append(server.Connections, Connection{Connection: conn, Token: token, ReceivedLast: true, Queue: [][]byte{}, ShouldClose: false, IsOK: true})
 			server.Logger.Log(lgr.Info, "New connection: %v", token)
 			// Send the token to the client
 			token_slice := []byte(token[:])
