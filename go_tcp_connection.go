@@ -199,7 +199,6 @@ func (server *Server) Start() {
 				if !server.Connections[i].ShouldClose {
 					if !server.Connections[i].IsOK {
 						server.Connections[i].ShouldClose = true
-						server.Logger.Log(lgr.Info, "Connection terminated")
 					} else {
 						server.Connections[i].IsOK = false
 						server.SendData(&server.Connections[i], event_are_you_ok, &[]byte{})
