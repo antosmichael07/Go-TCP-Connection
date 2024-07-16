@@ -69,7 +69,6 @@ type Package struct {
 
 const (
 	event_last_data_received uint16 = iota
-	event_error
 	event_connect
 	event_token
 )
@@ -367,11 +366,12 @@ func (server *Server) OnDisconnect(callback func(conn *Connection)) {
 }
 
 // Connect is a function that connects the client to the server
-func (client *Client) Connect() {
+func (client *Client) Connect() error {
 	// Connect to the server
 	conn, err := net.Dial("tcp", client.Address)
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
+		return err
 	}
 	// Save the connection
 	client.Connection = conn
@@ -390,10 +390,7 @@ func (client *Client) Connect() {
 		}
 	})
 
-	// Receive the error event
-	client.On(event_error, func(data *[]byte) {
-		client.Logger.Log(lgr.Error, "Error received: %s", string(*data))
-	})
+	return nil
 }
 
 // Disconnect is a function that disconnects the client from the server
