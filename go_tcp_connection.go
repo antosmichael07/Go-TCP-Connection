@@ -424,7 +424,9 @@ func (client *Client) ReceiveData() {
 	data = data[:n]
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error reading received data: %s", err)
-		client.Disconnect()
+		if !client.ShouldStop {
+			client.Disconnect()
+		}
 		return
 	}
 
