@@ -285,7 +285,7 @@ func (server *Server) ReceiveData(conn net.Conn) {
 		pkg := Package{}
 		pkg.FromByte(&data)
 
-		if pkg.Size < uint64(len(data)) {
+		if pkg.Size > uint64(len(data)) {
 			server.Logger.Log(lgr.Error, "Invalid data received: %v", data)
 			continue
 		}
