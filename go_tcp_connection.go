@@ -206,7 +206,7 @@ func (server *Server) Start() {
 				server.Logger.Log(lgr.Info, "Connection terminated")
 				continue
 			}
-			if server.Connections[i].Queue != nil && len(server.Connections[i].Queue) != 0 && server.Connections[i].ReceivedLast {
+			if server.Connections[i].Queue != nil && (len(server.Connections[i].Queue) != 0 && server.Connections[i].ReceivedLast || len(server.Connections[i].Queue) > 5) {
 				server.ActuallySendData(&server.Connections[i], &server.Connections[i].Queue[0])
 				server.Connections[i].Queue = server.Connections[i].Queue[1:]
 			}
