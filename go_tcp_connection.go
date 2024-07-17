@@ -423,6 +423,12 @@ func (client *Client) Connect() error {
 
 	client.On(event_are_you_ok, func(data *[]byte) {
 		client.SendData(event_are_you_ok, &[]byte{})
+		time.Sleep(1 * time.Second)
+		client.SendData(event_are_you_ok, &[]byte{})
+		time.Sleep(1 * time.Second)
+		client.SendData(event_are_you_ok, &[]byte{})
+		time.Sleep(1 * time.Second)
+		client.SendData(event_are_you_ok, &[]byte{})
 	})
 
 	return nil
