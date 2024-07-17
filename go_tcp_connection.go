@@ -259,7 +259,7 @@ func (server *Server) SendData(conn *Connection, event uint16, data *[]byte) {
 func (server *Server) ActuallySendData(conn *Connection, data *[]byte) {
 	// Send the data
 	_, err := conn.Connection.Write(*data)
-	if err != nil {
+	if err != nil || len(*data) < 74 {
 		server.Logger.Log(lgr.Error, "Error sending data: %s", err)
 	} else {
 		server.Logger.Log(lgr.Info, "Data sent with the event name: %v", uint16((*data)[72])|(uint16((*data)[73])<<8))
