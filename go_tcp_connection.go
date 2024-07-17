@@ -229,8 +229,10 @@ func (server *Server) Start() {
 		for i := 0; i < len(server.Connections); i++ {
 			if server.Connections[i].ShouldClose {
 				server.Connections[i].Connection.Close()
+				server.OnDisconnectFunc(&server.Connections[i])
 				server.Connections = append(server.Connections[:i], server.Connections[i+1:]...)
 				server.Logger.Log(lgr.Info, "Connection terminated")
+				i--
 				continue
 			}
 			if server.Connections[i].Queue != nil && (len(server.Connections[i].Queue) != 0 && server.Connections[i].ReceivedLast || len(server.Connections[i].Queue) > 5) {
