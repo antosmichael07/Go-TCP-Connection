@@ -486,7 +486,7 @@ func (client *Client) ReceiveData() {
 	client.Logger.Log(lgr.Info, "Data received with an event name: %v, data: %v", pkg.Event, pkg.Data)
 	for _, event := range client.PossibleEvents {
 		if event == pkg.Event {
-			client.Events[pkg.Event](&pkg.Data)
+			go client.Events[pkg.Event](&pkg.Data)
 			break
 		}
 	}
