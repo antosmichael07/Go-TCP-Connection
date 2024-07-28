@@ -30,6 +30,10 @@ type Server struct {
 	// Should be initialized with the function OnDisconnect to automatically set the IsOnDisconnect to true
 	OnDisconnectFunc func(conn *Connection)
 	IsOnDisconnect   bool
+	// OnStartFunc is the function that is called when the server starts if IsOnStart is true
+	// Should be initialized with the function OnStart to automatically set the IsOnStart to true
+	OnStartFunc func()
+	IsOnStart   bool
 }
 
 // Connection is a struct that contains the connection and the token of the client
@@ -224,6 +228,11 @@ func (server *Server) Start() {
 		}
 	}()
 
+	// Call the OnStart function
+	if server.IsOnStart {
+		server.OnStartFunc()
+	}
+
 	// Start sending data
 	for !server.ShouldStop {
 		for i := 0; i < len(server.Connections); i++ {
@@ -393,6 +402,11 @@ func (server *Server) OnConnect(callback func(conn *Connection)) {
 func (server *Server) OnDisconnect(callback func(conn *Connection)) {
 	server.OnDisconnectFunc = callback
 	server.IsOnDisconnect = true
+}
+
+// OnStart is a function that sets the OnStartFunc and IsOnStart to true
+func (server *Server) OnStart(callback func()) {
+	callback()
 }
 
 // Connect is a function that connects the client to the server
