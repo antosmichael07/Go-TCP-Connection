@@ -398,7 +398,7 @@ func (server *Server) OnDisconnect(callback func(conn *Connection)) {
 // Connect is a function that connects the client to the server
 func (client *Client) Connect() error {
 	// Connect to the server
-	net_dialer := net.Dialer{Timeout: 10 * time.Second}
+	net_dialer := net.Dialer{Timeout: 5 * time.Second}
 	conn, err := net_dialer.Dial("tcp", client.Address)
 	if err != nil {
 		client.Logger.Log(lgr.Error, "Error connecting to server: %s", err)
