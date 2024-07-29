@@ -408,7 +408,8 @@ func (server *Server) OnDisconnect(callback func(conn *Connection)) {
 
 // OnStart is a function that sets the OnStartFunc and IsOnStart to true
 func (server *Server) OnStart(callback func()) {
-	callback()
+	server.OnStartFunc = callback
+	server.IsOnStart = true
 }
 
 // Connect is a function that connects the client to the server
