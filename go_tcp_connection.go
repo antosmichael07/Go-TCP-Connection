@@ -153,6 +153,9 @@ func NewServer(address string) Server {
 		IsOnConnect:      false,
 		OnDisconnectFunc: func(conn *Connection) {},
 		IsOnDisconnect:   false,
+		OnStartFunc:      func() {},
+		IsOnStart:        false,
+		ShouldListen:     true,
 	}
 }
 
