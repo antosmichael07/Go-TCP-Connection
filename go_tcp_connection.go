@@ -34,6 +34,8 @@ type Server struct {
 	// Should be initialized with the function OnStart to automatically set the IsOnStart to true
 	OnStartFunc func()
 	IsOnStart   bool
+
+	ShouldListen bool
 }
 
 // Connection is a struct that contains the connection and the token of the client
@@ -216,10 +218,21 @@ func (server *Server) Start() error {
 	// Start receiving data
 	go func() {
 		for !server.ShouldStop {
+			for !server.ShouldListen {
+				time.Sleep(1 * time.Second)
+				if server.ShouldStop {
+					break
+				}
+			}
 			conn, err := server.Listener.Accept()
 			if server.ShouldStop {
 				break
 			}
+			if !server.ShouldListen {
+				conn.Close()
+				continue
+			}
+
 			if err != nil {
 				server.Logger.Log(lgr.Error, "Error accepting connection: %s", err)
 			}
