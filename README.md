@@ -1,7 +1,11 @@
 # Go-TCP-Connection
 
-A library meant to simplify the process of making TCP request and responses.<hr>
-Install with `go get github.com/antosmichael07/Go-TCP-Connection`
+- A library meant to simplify the process of making TCP/UDP request and responses
+- Install with `go get github.com/antosmichael07/Go-TCP-Connection`
+
+## Rules
+
+- Your events need to start from 4, events from 0 to 3 are reserved for client to server communication
 
 ## Example
 
@@ -22,7 +26,7 @@ const (
 )
 
 func main() {
-	server := tcp.NewServer("localhost:8080")
+	server := tcp.NewServer("localhost:8080", "tcp")
 	server.Logger.Level = lgr.Warning
 
 	server.OnConnect(func(conn *tcp.Connection) {
@@ -55,7 +59,7 @@ const (
 )
 
 func main() {
-	client := tcp.NewClient("localhost:8080")
+	client := tcp.NewClient("localhost:8080", "tcp")
 	client.Logger.Level = lgr.Warning
 	client.Connect()
 
